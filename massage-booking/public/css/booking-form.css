@@ -1,0 +1,185 @@
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #98c1d9;
+            --accent-color: #ee6c4d;
+            --light-color: #f8f9fa;
+            --dark-color: #293241;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark-color);
+            background-color: var(--light-color);
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+        
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        input[type="tel"]:focus,
+        textarea:focus,
+        select:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+        
+        .radio-group, .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .radio-option, .checkbox-option {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1 1 200px;
+        }
+        
+        .radio-option:hover, .checkbox-option:hover {
+            border-color: var(--primary-color);
+        }
+        
+        .radio-option.selected, .checkbox-option.selected {
+            border-color: var(--primary-color);
+            background-color: rgba(74, 111, 165, 0.1);
+        }
+        
+        .radio-option input, .checkbox-option input {
+            margin-right: 10px;
+        }
+        
+        .price {
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-left: 5px;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: block;
+            margin: 30px auto 0;
+        }
+        
+        button:hover {
+            background-color: #3a5a84;
+        }
+        
+        .calendar-container {
+            margin-top: 30px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .time-slots {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .time-slot {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .time-slot:hover {
+            border-color: var(--primary-color);
+        }
+        
+        .time-slot.selected {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .time-slot.unavailable {
+            background-color: #f1f1f1;
+            color: #999;
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+        
+        .privacy-notice {
+            margin-top: 30px;
+            font-size: 14px;
+            color: #666;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        
+        .summary {
+            margin-top: 20px;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .summary.visible {
+            display: block;
+        }
+        
+        @media (max-width: 768px) {
+            .time-slots {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }

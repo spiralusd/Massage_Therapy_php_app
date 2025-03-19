@@ -1,0 +1,182 @@
+/**
+ * Massage Booking System Admin Styles
+ * Based on the optimized-booking-form.html styling
+ */
+
+/* Color Variables */
+:root {
+    --primary-color: #4a6fa5;
+    --secondary-color: #98c1d9;
+    --accent-color: #ee6c4d;
+    --light-color: #f8f9fa;
+    --dark-color: #293241;
+}
+
+/* Admin Header */
+.massage-booking-admin h1 {
+    color: var(--primary-color);
+    margin-bottom: 20px;
+}
+
+/* Admin Tables */
+.massage-booking-admin .widefat {
+    border-collapse: collapse;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.massage-booking-admin .widefat th {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 10px;
+}
+
+.massage-booking-admin .widefat td {
+    padding: 10px;
+    vertical-align: middle;
+}
+
+/* Status Colors */
+.massage-booking-admin .status-pending {
+    color: #856404;
+    background-color: #fff3cd;
+    padding: 3px 8px;
+    border-radius: 3px;
+}
+
+.massage-booking-admin .status-confirmed {
+    color: #155724;
+    background-color: #d4edda;
+    padding: 3px 8px;
+    border-radius: 3px;
+}
+
+.massage-booking-admin .status-cancelled {
+    color: #721c24;
+    background-color: #f8d7da;
+    padding: 3px 8px;
+    border-radius: 3px;
+}
+
+/* Admin Forms */
+.massage-booking-admin .form-table th {
+    width: 200px;
+    padding: 15px;
+}
+
+.massage-booking-admin .form-table td {
+    padding: 15px;
+}
+
+.massage-booking-admin input[type="text"],
+.massage-booking-admin input[type="email"],
+.massage-booking-admin input[type="number"],
+.massage-booking-admin input[type="time"],
+.massage-booking-admin select,
+.massage-booking-admin textarea {
+    width: 100%;
+    max-width: 400px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.massage-booking-admin input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+/* Admin Buttons */
+.massage-booking-admin .button-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.massage-booking-admin .button-primary:hover {
+    background-color: #3a5a84;
+    border-color: #3a5a84;
+}
+
+.massage-booking-admin .button-secondary {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.massage-booking-admin .button-secondary:hover {
+    background-color: #f0f0f0;
+}
+
+/* Admin Dashboard Widget */
+#massage_booking_dashboard_widget .inside {
+    padding: 12px;
+}
+
+#massage_booking_dashboard_widget h4 {
+    margin-top: 0;
+    color: var(--primary-color);
+}
+
+#massage_booking_dashboard_widget ul.massage-booking-upcoming {
+    margin-left: 0;
+    padding-left: 0;
+}
+
+#massage_booking_dashboard_widget ul.massage-booking-upcoming li {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+/* Admin Tabs */
+.massage-booking-admin .nav-tab-wrapper {
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 20px;
+}
+
+.massage-booking-admin .nav-tab {
+    background-color: #f1f1f1;
+    color: #555;
+    border: 1px solid #ccc;
+    margin-right: 5px;
+}
+
+.massage-booking-admin .nav-tab-active {
+    background-color: #fff;
+    color: var(--primary-color);
+    border-bottom: 1px solid #fff;
+}
+
+/* Settings Page */
+.massage-booking-admin .settings-section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Calendar View (if needed) */
+.massage-booking-admin .calendar-container {
+    margin-top: 20px;
+}
+
+.massage-booking-admin .calendar-day {
+    border: 1px solid #ddd;
+    padding: 10px;
+    min-height: 100px;
+    background-color: white;
+}
+
+.massage-booking-admin .calendar-day-header {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 10px;
+    padding: 5px;
+    background-color: var(--secondary-color);
+    color: var(--dark-color);
+}
+
+.massage-booking-admin .calendar-appointment {
+    padding: 5px;
+    margin-bottom: 5px;
+    border-radius: 3px;
+    background-color: var(--light-color);
+    border-left: 3px solid var(--primary-color);
+}
