@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Massage Booking System
  * Description: HIPAA-compliant booking system for massage therapy
- * Version: 1.0.5
+ * Version: 1.0.5.1
  * Author: Darrin Jackson/Spiral Powered Records
  * Text Domain: massage-booking
  */
@@ -40,8 +40,14 @@ if (!defined('WPINC')) {
  * - Improved form responsiveness on mobile devices
  */
 
+/**
+ *  Version: 1.0.5.1
+ *  Changelog
+ *  -Small update to fix calender intergration
+*/
+
 // Define plugin constants
-define('MASSAGE_BOOKING_VERSION', '1.0.5'); // Match the plugin header version
+define('MASSAGE_BOOKING_VERSION', '1.0.5.1'); // Match the plugin header version
 define('MASSAGE_BOOKING_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MASSAGE_BOOKING_PLUGIN_URL', plugin_dir_url(__FILE__));
 

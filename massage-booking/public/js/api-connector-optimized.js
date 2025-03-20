@@ -567,129 +567,192 @@ jQuery(document).ready(function($) {
     appointmentForm.addEventListener('submit', async function(e) {
         // Prevent the default form submission
         e.preventDefault();
-        
+
         console.log('Form submission intercepted');
-        
+
         // Validate using enhanced validation
-        if (!enhancedValidation()) {
-            console.log('Form validation failed');
-            return;
+        if (typeof enhancedValidation === 'function') {
+            if (!enhancedValidation()) {
+                console.log('Form validation failed');
+                return;
+            }
+        } else if (typeof window.validateForm === 'function') {
+            if (!window.validateForm()) {
+                console.log('Form validation failed');
+                return;
+            }
         }
-        
+
         // Show loader
-        const loader = showLoader();
-        
+        const loader = showLoader ? showLoader() : null;
+
         // Get selected values
         const selectedTimeSlot = document.querySelector('.time-slot.selected');
         const selectedDuration = document.querySelector('input[name="duration"]:checked');
-        
+
         // Verify required selections
         if (!selectedTimeSlot || !selectedDuration) {
-            hideLoader(loader);
+            if (hideLoader) hideLoader(loader);
             alert('Please select a time slot and service duration.');
             return;
         }
-        
+
         // Get focus areas as an array
         const focusAreas = Array.from(document.querySelectorAll('input[name="focus"]:checked'))
             .map(checkbox => checkbox.value);
-        
-        // Prepare the form data for submission
-        const formData = {
-            fullName: document.getElementById('fullName').value,
-            email: document.getElementById('email').value,
-            phone: document.getElementById('phone').value,
-            appointmentDate: document.getElementById('appointmentDate').value,
-            startTime: selectedTimeSlot.getAttribute('data-time'),
-            endTime: selectedTimeSlot.getAttribute('data-end-time'),
-            duration: selectedDuration.value,
-            focusAreas: focusAreas,
-            pressurePreference: document.getElementById('pressurePreference').value,
-            specialRequests: document.getElementById('specialRequests').value
-        };
-        
-        console.log('Submitting appointment to WordPress:', formData);
-        
+
         try {
-            // Send data to WordPress API
-            const response = await fetch(massageBookingAPI.restUrl + 'appointments', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': massageBookingAPI.nonce,
-                    'Accept': 'application/json'
-                },
-                body: JSON.stringify(formData)
+            // APPROACH 1: Use AJAX instead of fetch
+            // This is more compatible with older WordPress setups
+
+            // Create a traditional AJAX request
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', massageBookingAPI.ajaxUrl, true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+            // Set up form data in URL encoded format
+            const ajaxData = new URLSearchParams({
+                'action': 'massage_booking_create_appointment',
+                'nonce': massageBookingAPI.nonce,
+                'fullName': document.getElementById('fullName').value,
+                'email': document.getElementById('email').value,
+                'phone': document.getElementById('phone').value,
+                'appointmentDate': document.getElementById('appointmentDate').value,
+                'startTime': selectedTimeSlot.getAttribute('data-time'),
+                'endTime': selectedTimeSlot.getAttribute('data-end-time'),
+                'duration': selectedDuration.value,
+                'focusAreas': JSON.stringify(focusAreas),
+                'pressurePreference': document.getElementById('pressurePreference').value,
+                'specialRequests': document.getElementById('specialRequests').value
             });
-            
-            // Try to parse response as JSON with error handling
+
+            console.log('Submitting appointment via AJAX:', ajaxData.toString());
+
+            // Handle response
+            xhr.onload = function() {
+                if (hideLoader) hideLoader(loader);
+
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.success) {
+                        console.log('Appointment successfully created:', response);
+
+                        // Show success message
+                        alert('Your appointment has been booked! A confirmation email will be sent shortly.');
+
+                        // Reset form
+                        resetForm();
+                    } else {
+                        throw new Error(response.message || 'Failed to book appointment');
+                    }
+                } catch (parseError) {
+                    console.error('Error parsing response:', parseError, 'Raw response:', xhr.responseText);
+                    alert('There was a problem processing the server response. Please try again or contact support.');
+                }
+            };
+
+            xhr.onerror = function() {
+                if (hideLoader) hideLoader(loader);
+                console.error('Network error occurred');
+                alert('A network error occurred. Please check your internet connection and try again.');
+            };
+
+            // Send the request
+            xhr.send(ajaxData.toString());
+
+            // ------ ALTERNATIVE APPROACH ------
+            // If you prefer using fetch, but want a more robust implementation,
+            // replace the XMLHttpRequest code above with this:
+            /*
+            // Create FormData object
+            const formData = new FormData();
+            formData.append('action', 'massage_booking_create_appointment');
+            formData.append('nonce', massageBookingAPI.nonce);
+            formData.append('fullName', document.getElementById('fullName').value);
+            formData.append('email', document.getElementById('email').value);
+            formData.append('phone', document.getElementById('phone').value);
+            formData.append('appointmentDate', document.getElementById('appointmentDate').value);
+            formData.append('startTime', selectedTimeSlot.getAttribute('data-time'));
+            formData.append('endTime', selectedTimeSlot.getAttribute('data-end-time'));
+            formData.append('duration', selectedDuration.value);
+            formData.append('focusAreas', JSON.stringify(focusAreas));
+            formData.append('pressurePreference', document.getElementById('pressurePreference').value);
+            formData.append('specialRequests', document.getElementById('specialRequests').value);
+
+            console.log('Submitting appointment via Fetch FormData');
+
+            const response = await fetch(massageBookingAPI.ajaxUrl, {
+                method: 'POST',
+                body: formData,
+                // No need to set Content-Type header - browser sets it with boundary
+            });
+
+            // Just log the raw response for debugging
+            const rawText = await response.text();
+            console.log('Raw server response:', rawText);
+
+            // Try to parse JSON from the response
             let responseData;
             try {
-                responseData = await response.json();
-            } catch (jsonError) {
-                console.error('Failed to parse response JSON:', jsonError);
-                // Try alternate approach - get text and parse manually
-                const text = await response.text();
-                try {
-                    // Remove any non-JSON content that might precede the JSON data
-                    const jsonStart = text.indexOf('{');
-                    if (jsonStart >= 0) {
-                        const cleanJson = text.substring(jsonStart);
-                        responseData = JSON.parse(cleanJson);
-                    } else {
-                        throw new Error('No JSON object found in response');
-                    }
-                } catch (e) {
-                    throw new Error('Invalid response format: ' + text);
-                }
+                responseData = JSON.parse(rawText);
+            } catch (parseError) {
+                console.error('Error parsing response:', parseError);
+                if (hideLoader) hideLoader(loader);
+                alert('The server returned an invalid response. Please try again later.');
+                return;
             }
-            
-            if (!response.ok) {
+
+            if (hideLoader) hideLoader(loader);
+
+            if (responseData.success) {
+                console.log('Appointment successfully created:', responseData);
+
+                // Show success message
+                alert('Your appointment has been booked! A confirmation email will be sent shortly.');
+
+                // Reset form
+                resetForm();
+            } else {
                 throw new Error(responseData.message || 'Failed to book appointment');
             }
-            
-            console.log('Appointment successfully created:', responseData);
-            
-            // Hide loader
-            hideLoader(loader);
-            
-            // Show success message
-            alert('Your appointment has been booked! A confirmation email will be sent shortly.');
-            
-            // Reset form
-            this.reset();
-            
-            // Clear selections
-            document.querySelectorAll('.radio-option, .checkbox-option, .time-slot').forEach(el => {
-                el.classList.remove('selected');
-            });
-            
-            // Hide summary
-            const summaryElement = document.getElementById('bookingSummary');
-            if (summaryElement) {
-                summaryElement.classList.remove('visible');
-            }
-            
-            // Reset time slots
-            document.getElementById('timeSlots').innerHTML = '<p>Please select a date to see available time slots.</p>';
-            
-            // Reselect default option (60 min)
-            const defaultOption = document.getElementById('duration60');
-            if (defaultOption) {
-                defaultOption.checked = true;
-                const radioOption = defaultOption.closest('.radio-option');
-                if (radioOption) {
-                    radioOption.classList.add('selected');
-                }
-            }
+            */
         } catch (error) {
-            // Hide loader
-            hideLoader(loader);
-            
+            if (hideLoader) hideLoader(loader);
             console.error('Error booking appointment:', error);
             alert('Error: ' + error.message);
         }
     }, true); // Using capture phase to ensure our handler runs first
+
+    // Helper function to reset the form after successful submission
+    function resetForm() {
+        // Reset form
+        appointmentForm.reset();
+
+        // Clear selections
+        document.querySelectorAll('.radio-option, .checkbox-option, .time-slot').forEach(el => {
+            el.classList.remove('selected');
+        });
+
+        // Hide summary
+        const summaryElement = document.getElementById('bookingSummary');
+        if (summaryElement) {
+            summaryElement.classList.remove('visible');
+        }
+
+        // Reset time slots
+        document.getElementById('timeSlots').innerHTML = '<p>Please select a date to see available time slots.</p>';
+
+        // Reselect default option (60 min)
+        const defaultOption = document.getElementById('duration60');
+        if (defaultOption) {
+            defaultOption.checked = true;
+            const radioOption = defaultOption.closest('.radio-option');
+            if (radioOption) {
+                radioOption.classList.add('selected');
+            }
+        }
+    }
     
     // Initialize the form by loading settings
     window.loadSettings().then(() => {

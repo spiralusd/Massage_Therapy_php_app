@@ -50,23 +50,24 @@ class Massage_Booking_MS_Graph_Auth {
      * Generate Microsoft login URL
      */
     public function generate_login_url() {
-        $scopes = urlencode('offline_access openid profile User.Read Calendars.ReadWrite');
-        
-        return sprintf(
-            'https://login.microsoftonline.com/%s/oauth2/v2.0/authorize?'.
-            'client_id=%s&'.
-            'response_type=code&'.
-            'redirect_uri=%s&'.
-            'response_mode=query&'.
-            'scope=%s&'.
-            'state=%s',
-            $this->tenant_id,
-            $this->client_id,
-            urlencode($this->redirect_uri),
-            $scopes,
-            wp_create_nonce('ms_graph_auth_state')
-        );
-    }
+    $scopes = urlencode('offline_access openid profile User.Read Calendars.ReadWrite');
+    
+    return sprintf(
+        'https://login.microsoftonline.com/%s/oauth2/v2.0/authorize?'.
+        'client_id=%s&'.
+        'response_type=code&'.
+        'redirect_uri=%s&'.
+        'response_mode=query&'.
+        'scope=%s&'.
+        'prompt=consent&'. // This ensures you get a refresh token
+        'state=%s',
+        $this->tenant_id,
+        $this->client_id,
+        urlencode($this->redirect_uri),
+        $scopes,
+        wp_create_nonce('ms_graph_auth_state')
+    );
+}
 
     /**
      * Handle Microsoft authentication callback

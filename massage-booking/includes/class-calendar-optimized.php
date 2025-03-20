@@ -557,7 +557,7 @@ class Massage_Booking_Calendar {
         }
     }
     
-   /**
+/**
  * Get access token for Microsoft Graph API with Delegated Authentication
  * 
  * @return string|false Access token or false on failure
@@ -616,7 +616,7 @@ private function get_access_token() {
                 'client_secret' => $this->client_secret,
                 'grant_type' => 'refresh_token',
                 'refresh_token' => $refresh_token,
-                'scope' => 'https://graph.microsoft.com/.default'
+                'scope' => 'https://graph.microsoft.com/.default openid profile offline_access'
             ],
             'timeout' => 15
         ]);

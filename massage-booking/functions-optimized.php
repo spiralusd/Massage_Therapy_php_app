@@ -548,3 +548,116 @@ function massage_booking_rest_ensure_response($response, $handler, $request) {
     return $response;
 }
 add_filter('rest_request_after_callbacks', 'massage_booking_rest_ensure_response', 10, 3);
+
+function massage_booking_handle_appointment_ajax() {
+    // Verify nonce
+    if (!check_ajax_referer('wp_rest', 'nonce', false)) {
+        wp_send_json_error(array('message' => 'Security check failed'));
+        exit;
+    }
+    
+    // Get and sanitize data from POST request
+    $full_name = isset($_POST['fullName']) ? sanitize_text_field($_POST['fullName']) : '';
+    $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
+    $phone = isset($_POST['phone']) ? sanitize_text_field($_POST['phone']) : '';
+    $appointment_date = isset($_POST['appointmentDate']) ? sanitize_text_field($_POST['appointmentDate']) : '';
+    $start_time = isset($_POST['startTime']) ? sanitize_text_field($_POST['startTime']) : '';
+    $end_time = isset($_POST['endTime']) ? sanitize_text_field($_POST['endTime']) : '';
+    $duration = isset($_POST['duration']) ? intval($_POST['duration']) : 0;
+    $focus_areas = isset($_POST['focusAreas']) ? json_decode(stripslashes($_POST['focusAreas']), true) : array();
+    $pressure_preference = isset($_POST['pressurePreference']) ? sanitize_text_field($_POST['pressurePreference']) : '';
+    $special_requests = isset($_POST['specialRequests']) ? sanitize_textarea_field($_POST['specialRequests']) : '';
+    
+    // Validate required fields
+    if (empty($full_name) || empty($email) || empty($phone) || empty($appointment_date) || empty($start_time) || empty($duration)) {
+        wp_send_json_error(array('message' => 'Missing required fields'));
+        exit;
+    }
+    
+    // Validate email
+    if (!is_email($email)) {
+        wp_send_json_error(array('message' => 'Invalid email address'));
+        exit;
+    }
+    
+    try {
+        // Require database class if not already loaded
+        if (!class_exists('Massage_Booking_Database')) {
+            require_once(MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-database-optimized.php');
+        }
+        
+        $db = new Massage_Booking_Database();
+        
+        // Prepare appointment data
+        $appointment_data = array(
+            'full_name' => $full_name,
+            'email' => $email,
+            'phone' => $phone,
+            'appointment_date' => $appointment_date,
+            'start_time' => $start_time,
+            'end_time' => $end_time,
+            'duration' => $duration,
+            'focus_areas' => $focus_areas,
+            'pressure_preference' => $pressure_preference,
+            'special_requests' => $special_requests,
+            'status' => 'confirmed',
+        );
+        
+        // Check if the slot is still available
+        if (!$db->check_slot_availability($appointment_data['appointment_date'], $appointment_data['start_time'], $appointment_data['duration'])) {
+            wp_send_json_error(array('message' => 'This time slot is no longer available'));
+            exit;
+        }
+        
+        // Add to Office 365 Calendar if configured
+        if (class_exists('Massage_Booking_Calendar') && function_exists('massage_booking_is_calendar_configured')) {
+            if (massage_booking_is_calendar_configured()) {
+                $calendar = new Massage_Booking_Calendar();
+                $event_result = $calendar->create_event($appointment_data);
+                
+                if (!is_wp_error($event_result) && isset($event_result['id'])) {
+                    $appointment_data['calendar_event_id'] = $event_result['id'];
+                }
+            }
+        }
+        
+        // Save appointment
+        $appointment_id = $db->create_appointment($appointment_data);
+        
+        if (!$appointment_id) {
+            wp_send_json_error(array('message' => 'Failed to save appointment'));
+            exit;
+        }
+        
+        // Send confirmation emails
+        if (class_exists('Massage_Booking_Emails')) {
+            $emails = new Massage_Booking_Emails();
+            $emails->send_client_confirmation($appointment_data);
+            $emails->send_therapist_notification($appointment_data);
+        }
+        
+        // Fire action hook for additional processing
+        do_action('massage_booking_after_appointment_created', $appointment_id, $appointment_data);
+        
+        // Return success response
+        wp_send_json_success(array(
+            'appointment_id' => $appointment_id,
+            'message' => 'Appointment booked successfully.'
+        ));
+        
+    } catch (Exception $e) {
+        // Log the error
+        error_log('Appointment creation error: ' . $e->getMessage());
+        
+        // Return error response
+        wp_send_json_error(array(
+            'message' => 'Error processing appointment: ' . $e->getMessage()
+        ));
+    }
+    
+    // Always die at the end of AJAX callbacks
+    wp_die();
+}
+// Hook AJAX handler to WordPress
+add_action('wp_ajax_massage_booking_create_appointment', 'massage_booking_handle_appointment_ajax');
+add_action('wp_ajax_nopriv_massage_booking_create_appointment', 'massage_booking_handle_appointment_ajax');
