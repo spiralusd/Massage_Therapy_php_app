@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Massage Booking System
  * Description: HIPAA-compliant booking system for massage therapy
- * Version: 1.0.3
+ * Version: 1.0.5
  * Author: Darrin Jackson/Spiral Powered Records
  * Text Domain: massage-booking
  */
@@ -17,6 +17,8 @@ if (!defined('WPINC')) {
 // 1.0.1 - Bug fixes and performance improvements
 // 1.0.2 - Enhanced security and optimization
 // 1.0.3 - Added thank you page, email verification, and diagnostics features
+// 1.0.4 - Minor Changes, fixed Json
+// 1.0.5 - Bug fixes, improved appointments page
 
 /**
  * Changelog for version 1.0.3:
@@ -27,8 +29,19 @@ if (!defined('WPINC')) {
  * - Improved admin email configuration testing
  */
 
+/**
+ * Version: 1.0.5
+ * Changelog:
+ * - Fixed timezone compatibility issue with Microsoft Graph API
+ * - Resolved JSON parsing errors in form submission
+ * - Improved time slot loading and selection
+ * - Enhanced error handling and user feedback
+ * - Added additional HIPAA-compliant logging
+ * - Improved form responsiveness on mobile devices
+ */
+
 // Define plugin constants
-define('MASSAGE_BOOKING_VERSION', '1.0.3'); // Match the plugin header version
+define('MASSAGE_BOOKING_VERSION', '1.0.5'); // Match the plugin header version
 define('MASSAGE_BOOKING_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MASSAGE_BOOKING_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -72,6 +85,9 @@ require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/thank-you-page-integration.p
 
 // Include Microsoft Graph Authentication Handler
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-ms-graph-auth.php';
+
+// Include the emails class
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/emails-optimized.php';
 
 // Activation hook
 register_activation_hook(__FILE__, 'massage_booking_activate');

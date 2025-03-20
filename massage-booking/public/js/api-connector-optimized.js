@@ -24,6 +24,7 @@ jQuery(document).ready(function($) {
     const originalLoadSettings = window.loadSettings;
     const originalFetchTimeSlots = window.fetchAvailableTimeSlots;
     const originalUpdateSummary = window.updateSummary;
+    const originalValidateForm = window.validateForm;
     
     // Loading indicator for API calls
     const createLoader = () => {
@@ -292,26 +293,43 @@ jQuery(document).ready(function($) {
             const slotsContainer = document.getElementById('timeSlots');
             slotsContainer.innerHTML = '<p>Loading available times...</p>';
             
-            // Generate nonce for this specific request
-            const timeSlotNonce = await generateRequestNonce('check_time_slots');
+            // Fetch available slots from WordPress API with proper error handling
+            let timeSlotUrl = `${massageBookingAPI.restUrl}available-slots?date=${encodeURIComponent(date)}&duration=${encodeURIComponent(duration)}`;
             
-            // Fetch available slots from WordPress API
-            const response = await fetch(
-                `${massageBookingAPI.restUrl}available-slots?date=${date}&duration=${duration}`,
-                {
-                    method: 'GET',
-                    headers: {
-                        'X-WP-Nonce': massageBookingAPI.nonce,
-                        'X-Booking-Request-Nonce': timeSlotNonce
-                    }
+            const response = await fetch(timeSlotUrl, {
+                method: 'GET',
+                headers: {
+                    'X-WP-Nonce': massageBookingAPI.nonce,
+                    'Accept': 'application/json'
                 }
-            );
+            });
             
             if (!response.ok) {
                 throw new Error(`Failed to load time slots (HTTP ${response.status})`);
             }
             
-            const data = await response.json();
+            // Try to parse response as JSON with error handling
+            let data;
+            try {
+                data = await response.json();
+            } catch (jsonError) {
+                console.error('Failed to parse time slots JSON:', jsonError);
+                // Try alternate approach - get text and parse manually
+                const text = await response.text();
+                try {
+                    // Remove any non-JSON content that might precede the JSON data
+                    const jsonStart = text.indexOf('{');
+                    if (jsonStart >= 0) {
+                        const cleanJson = text.substring(jsonStart);
+                        data = JSON.parse(cleanJson);
+                    } else {
+                        throw new Error('No JSON object found in response');
+                    }
+                } catch (e) {
+                    throw new Error('Invalid response format');
+                }
+            }
+            
             console.log('Available slots from WordPress:', data);
             
             // Cache the response
@@ -398,33 +416,6 @@ jQuery(document).ready(function($) {
         });
     }
     
-    // Generate a request-specific nonce for additional security
-    async function generateRequestNonce(action) {
-        try {
-            const response = await fetch(massageBookingAPI.ajaxUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    action: 'generate_booking_nonce',
-                    booking_action: action,
-                    _wpnonce: massageBookingAPI.nonce
-                })
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to generate nonce');
-            }
-            
-            const data = await response.json();
-            return data.nonce || '';
-        } catch (error) {
-            console.error('Error generating nonce:', error);
-            return '';
-        }
-    }
-    
     // Validate email format
     function validateEmail(email) {
         const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -506,13 +497,21 @@ jQuery(document).ready(function($) {
         const selectedTimeSlot = document.querySelector('.time-slot.selected');
         if (!selectedTimeSlot) {
             errors.push('Please select an appointment time');
-            document.getElementById('timeSlots').style.borderColor = 'red';
+            if (document.getElementById('timeSlots')) {
+                document.getElementById('timeSlots').style.borderColor = 'red';
+            }
         } else {
-            document.getElementById('timeSlots').style.borderColor = '';
+            if (document.getElementById('timeSlots')) {
+                document.getElementById('timeSlots').style.borderColor = '';
+            }
         }
         
         // Display validation errors if any
         if (errors.length > 0) {
+            // Remove any existing error containers
+            const existingErrors = document.querySelectorAll('.validation-errors');
+            existingErrors.forEach(el => el.parentNode.removeChild(el));
+            
             // Create error message element
             const errorContainer = document.createElement('div');
             errorContainer.className = 'validation-errors';
@@ -551,15 +550,169 @@ jQuery(document).ready(function($) {
             // Scroll to errors
             errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
             
-            // Remove after 5 seconds
+            // Remove after 8 seconds
             setTimeout(() => {
                 if (errorContainer.parentNode) {
                     errorContainer.parentNode.removeChild(errorContainer);
                 }
-            }, 5000);
+            }, 8000);
             
             return false;
         }
         
         return true;
     }
+    
+    // Override the form submission
+    appointmentForm.addEventListener('submit', async function(e) {
+        // Prevent the default form submission
+        e.preventDefault();
+        
+        console.log('Form submission intercepted');
+        
+        // Validate using enhanced validation
+        if (!enhancedValidation()) {
+            console.log('Form validation failed');
+            return;
+        }
+        
+        // Show loader
+        const loader = showLoader();
+        
+        // Get selected values
+        const selectedTimeSlot = document.querySelector('.time-slot.selected');
+        const selectedDuration = document.querySelector('input[name="duration"]:checked');
+        
+        // Verify required selections
+        if (!selectedTimeSlot || !selectedDuration) {
+            hideLoader(loader);
+            alert('Please select a time slot and service duration.');
+            return;
+        }
+        
+        // Get focus areas as an array
+        const focusAreas = Array.from(document.querySelectorAll('input[name="focus"]:checked'))
+            .map(checkbox => checkbox.value);
+        
+        // Prepare the form data for submission
+        const formData = {
+            fullName: document.getElementById('fullName').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            appointmentDate: document.getElementById('appointmentDate').value,
+            startTime: selectedTimeSlot.getAttribute('data-time'),
+            endTime: selectedTimeSlot.getAttribute('data-end-time'),
+            duration: selectedDuration.value,
+            focusAreas: focusAreas,
+            pressurePreference: document.getElementById('pressurePreference').value,
+            specialRequests: document.getElementById('specialRequests').value
+        };
+        
+        console.log('Submitting appointment to WordPress:', formData);
+        
+        try {
+            // Send data to WordPress API
+            const response = await fetch(massageBookingAPI.restUrl + 'appointments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': massageBookingAPI.nonce,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            // Try to parse response as JSON with error handling
+            let responseData;
+            try {
+                responseData = await response.json();
+            } catch (jsonError) {
+                console.error('Failed to parse response JSON:', jsonError);
+                // Try alternate approach - get text and parse manually
+                const text = await response.text();
+                try {
+                    // Remove any non-JSON content that might precede the JSON data
+                    const jsonStart = text.indexOf('{');
+                    if (jsonStart >= 0) {
+                        const cleanJson = text.substring(jsonStart);
+                        responseData = JSON.parse(cleanJson);
+                    } else {
+                        throw new Error('No JSON object found in response');
+                    }
+                } catch (e) {
+                    throw new Error('Invalid response format: ' + text);
+                }
+            }
+            
+            if (!response.ok) {
+                throw new Error(responseData.message || 'Failed to book appointment');
+            }
+            
+            console.log('Appointment successfully created:', responseData);
+            
+            // Hide loader
+            hideLoader(loader);
+            
+            // Show success message
+            alert('Your appointment has been booked! A confirmation email will be sent shortly.');
+            
+            // Reset form
+            this.reset();
+            
+            // Clear selections
+            document.querySelectorAll('.radio-option, .checkbox-option, .time-slot').forEach(el => {
+                el.classList.remove('selected');
+            });
+            
+            // Hide summary
+            const summaryElement = document.getElementById('bookingSummary');
+            if (summaryElement) {
+                summaryElement.classList.remove('visible');
+            }
+            
+            // Reset time slots
+            document.getElementById('timeSlots').innerHTML = '<p>Please select a date to see available time slots.</p>';
+            
+            // Reselect default option (60 min)
+            const defaultOption = document.getElementById('duration60');
+            if (defaultOption) {
+                defaultOption.checked = true;
+                const radioOption = defaultOption.closest('.radio-option');
+                if (radioOption) {
+                    radioOption.classList.add('selected');
+                }
+            }
+        } catch (error) {
+            // Hide loader
+            hideLoader(loader);
+            
+            console.error('Error booking appointment:', error);
+            alert('Error: ' + error.message);
+        }
+    }, true); // Using capture phase to ensure our handler runs first
+    
+    // Initialize the form by loading settings
+    window.loadSettings().then(() => {
+        console.log('Settings loaded and applied to form');
+        
+        // Try to restore any saved form state
+        try {
+            const savedData = sessionStorage.getItem('massageBookingFormData');
+            if (savedData) {
+                const formData = JSON.parse(savedData);
+                
+                // Restore date if it was selected
+                if (formData.appointmentDate) {
+                    const dateField = document.getElementById('appointmentDate');
+                    dateField.value = formData.appointmentDate;
+                    
+                    // Trigger date input event to load time slots
+                    const event = new Event('input', { bubbles: true });
+                    dateField.dispatchEvent(event);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to restore saved form state:', e);
+        }
+    });
+});

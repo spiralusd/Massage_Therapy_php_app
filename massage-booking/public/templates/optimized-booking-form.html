@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Massage Therapy Appointment Booking</title>
     <style>
         :root {
@@ -177,9 +178,72 @@
             display: block;
         }
         
+        .api-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4a6fa5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .validation-errors {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+        }
+        
+        .validation-errors ul {
+            margin-top: 10px;
+            padding-left: 20px;
+        }
+        
+        .retry-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            font-size: 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            display: inline-block;
+        }
+        
         @media (max-width: 768px) {
             .time-slots {
                 grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .radio-group, .checkbox-group {
+                flex-direction: column;
+            }
+            
+            .radio-option, .checkbox-option {
+                flex: 1 1 100%;
             }
         }
     </style>
@@ -295,5 +359,66 @@
             <button type="submit">Book Appointment</button>
         </form>
     </div>
+
+    <script>
+        /**
+         * Form initialization - to be replaced by the main script
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set minimum date to today
+            const today = new Date();
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            document.getElementById('appointmentDate').min = tomorrow.toISOString().split('T')[0];
+            
+            // Initialize the form
+            if (typeof window.loadSettings === 'function') {
+                window.loadSettings();
+            }
+            
+            // Initialize radio buttons
+            document.querySelectorAll('.radio-option').forEach(option => {
+                // If the radio button is checked initially, add selected class
+                if (option.querySelector('input[type="radio"]').checked) {
+                    option.classList.add('selected');
+                }
+                
+                option.addEventListener('click', function() {
+                    // Find all radio options and remove selected class
+                    document.querySelectorAll('.radio-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    
+                    // Add selected class to clicked option
+                    this.classList.add('selected');
+                    
+                    // Check the radio input
+                    this.querySelector('input[type="radio"]').checked = true;
+                    
+                    // Update booking summary if it exists
+                    if (typeof window.updateSummary === 'function') {
+                        window.updateSummary();
+                    }
+                });
+            });
+            
+            // Initialize checkbox options
+            document.querySelectorAll('.checkbox-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    this.classList.toggle('selected');
+                    
+                    // Toggle checkbox
+                    const checkbox = this.querySelector('input[type="checkbox"]');
+                    checkbox.checked = !checkbox.checked;
+                    
+                    // Update booking summary if it exists
+                    if (typeof window.updateSummary === 'function') {
+                        window.updateSummary();
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

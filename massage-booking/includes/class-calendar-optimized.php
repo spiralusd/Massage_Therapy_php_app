@@ -68,13 +68,43 @@ class Massage_Booking_Calendar {
         $this->client_secret = $settings->get_setting('ms_client_secret');
         $this->tenant_id = $settings->get_setting('ms_tenant_id');
         
-        // Get timezone from WordPress
-        $this->timezone = wp_timezone_string();
+        // FIX: Use a proper IANA timezone identifier instead of PHP timezone string
+        // Common US timezones: America/New_York, America/Chicago, America/Denver, America/Los_Angeles
+        $this->timezone = 'America/New_York'; // Default to Eastern Time
+        
+        // Try to get WordPress timezone setting and convert to IANA if possible
+        $wp_timezone = wp_timezone_string();
+        if (!empty($wp_timezone) && $this->is_valid_timezone($wp_timezone)) {
+            $this->timezone = $wp_timezone;
+        }
         
         // Log calendar initialization
         $this->log_calendar_action('initialize', [
-            'status' => $this->is_configured() ? 'configured' : 'not_configured'
+            'status' => $this->is_configured() ? 'configured' : 'not_configured',
+            'timezone' => $this->timezone
         ]);
+    }
+    
+    /**
+     * Check if a timezone string is valid
+     *
+     * @param string $timezone Timezone to check
+     * @return bool True if valid
+     */
+    private function is_valid_timezone($timezone) {
+        // List of known problematic timezone formats
+        $invalid_formats = ['+00:00', 'UTC+0', 'UTC'];
+        
+        if (in_array($timezone, $invalid_formats)) {
+            return false;
+        }
+        
+        try {
+            new DateTimeZone($timezone);
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
     }
     
     /**
@@ -104,24 +134,64 @@ class Massage_Booking_Calendar {
         }
         
         try {
+            // Validate required fields
+            if (empty($appointment['full_name']) || empty($appointment['appointment_date']) || 
+                empty($appointment['start_time']) || empty($appointment['end_time']) ||
+                empty($appointment['duration'])) {
+                
+                $this->log_calendar_action('create_event_validation_error', [
+                    'error' => 'Missing required appointment data',
+                    'appointment_id' => isset($appointment['id']) ? $appointment['id'] : null
+                ]);
+                return new WP_Error('invalid_data', 'Missing required appointment data');
+            }
+            
             // Format start and end times
             $start_datetime = new DateTime($appointment['appointment_date'] . ' ' . $appointment['start_time']);
             $end_datetime = new DateTime($appointment['appointment_date'] . ' ' . $appointment['end_time']);
             
-            // Handle focus areas
+            // Sanitize appointment data for event creation
+            $sanitized_name = sanitize_text_field($appointment['full_name']);
+            $sanitized_email = sanitize_email($appointment['email']);
+            $sanitized_phone = sanitize_text_field($appointment['phone']);
+            $sanitized_duration = intval($appointment['duration']);
+            
+            // Handle focus areas safely
             $focus_areas = '';
             if (isset($appointment['focus_areas'])) {
-                $focus_areas = is_array($appointment['focus_areas']) 
-                    ? implode(', ', $appointment['focus_areas']) 
-                    : $appointment['focus_areas'];
+                if (is_array($appointment['focus_areas'])) {
+                    $sanitized_areas = array_map('sanitize_text_field', $appointment['focus_areas']);
+                    $focus_areas = implode(', ', $sanitized_areas);
+                } else {
+                    $focus_areas = sanitize_text_field($appointment['focus_areas']);
+                }
+                
+                // Make sure it's not too long
+                $focus_areas = substr($focus_areas, 0, 100);
             }
             
-            // Create event object
+            // Handle pressure preference safely
+            $pressure_preference = '';
+            if (isset($appointment['pressure_preference'])) {
+                $pressure_preference = sanitize_text_field($appointment['pressure_preference']);
+                // Limit length to prevent database issues
+                $pressure_preference = substr($pressure_preference, 0, 50);
+            }
+            
+            // Handle special requests safely
+            $special_requests = '';
+            if (isset($appointment['special_requests'])) {
+                $special_requests = sanitize_textarea_field($appointment['special_requests']);
+                // Limit length
+                $special_requests = substr($special_requests, 0, 500);
+            }
+            
+            // Create event object with sanitized data
             $event = [
-                'subject' => 'Massage - ' . $appointment['duration'] . ' min (' . $appointment['full_name'] . ')',
+                'subject' => 'Massage - ' . $sanitized_duration . ' min (' . $sanitized_name . ')',
                 'body' => [
                     'contentType' => 'text',
-                    'content' => "Client: {$appointment['full_name']}\nEmail: {$appointment['email']}\nPhone: {$appointment['phone']}\nFocus Areas: {$focus_areas}\nPressure: {$appointment['pressure_preference']}\nSpecial Requests: {$appointment['special_requests']}"
+                    'content' => "Client: {$sanitized_name}\nEmail: {$sanitized_email}\nPhone: {$sanitized_phone}\nFocus Areas: {$focus_areas}\nPressure: {$pressure_preference}\nSpecial Requests: {$special_requests}"
                 ],
                 'start' => [
                     'dateTime' => $start_datetime->format('Y-m-d\TH:i:s'),
@@ -131,11 +201,16 @@ class Massage_Booking_Calendar {
                     'dateTime' => $end_datetime->format('Y-m-d\TH:i:s'),
                     'timeZone' => $this->timezone
                 ],
-                'showAs' => 'busy',
-                'reminder' => [
-                    'reminderMinutesBeforeStart' => 15
-                ]
+                'showAs' => 'busy'
             ];
+            
+            // Log the event data for debugging (sensitive data removed)
+            $this->log_calendar_action('create_event_request', [
+                'event_subject' => $event['subject'],
+                'start_time' => $event['start']['dateTime'],
+                'end_time' => $event['end']['dateTime'],
+                'timezone' => $this->timezone
+            ]);
             
             // Call Microsoft Graph API to create event
             $response = wp_remote_post(
@@ -167,6 +242,7 @@ class Massage_Booking_Calendar {
                 $this->log_calendar_action('create_event_error', [
                     'status_code' => $status_code,
                     'error' => $error_message,
+                    'response_body' => $body,
                     'appointment_id' => isset($appointment['id']) ? $appointment['id'] : null
                 ]);
                 
@@ -179,7 +255,7 @@ class Massage_Booking_Calendar {
             
             // Log successful event creation
             $this->log_calendar_action('create_event_success', [
-                'event_id' => $body['id'],
+                'event_id' => isset($body['id']) ? $body['id'] : 'unknown',
                 'appointment_id' => isset($appointment['id']) ? $appointment['id'] : null
             ]);
             
@@ -187,6 +263,7 @@ class Massage_Booking_Calendar {
         } catch (Exception $e) {
             $this->log_calendar_action('create_event_exception', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'appointment_id' => isset($appointment['id']) ? $appointment['id'] : null
             ]);
             
@@ -212,9 +289,14 @@ class Massage_Booking_Calendar {
         }
         
         try {
+            // Validate event ID
+            if (empty($event_id)) {
+                return new WP_Error('invalid_event_id', 'Event ID is required');
+            }
+            
             // Call Microsoft Graph API to delete event
             $response = wp_remote_request(
-                $this->graph_endpoint . "me/events/{$event_id}",
+                $this->graph_endpoint . "me/events/" . sanitize_text_field($event_id),
                 [
                     'method' => 'DELETE',
                     'headers' => [
@@ -287,24 +369,55 @@ class Massage_Booking_Calendar {
         }
         
         try {
+            // Validate required parameters
+            if (empty($event_id) || empty($appointment)) {
+                return new WP_Error('invalid_parameters', 'Event ID and appointment data are required');
+            }
+            
             // Format start and end times
             $start_datetime = new DateTime($appointment['appointment_date'] . ' ' . $appointment['start_time']);
             $end_datetime = new DateTime($appointment['appointment_date'] . ' ' . $appointment['end_time']);
             
-            // Handle focus areas
+            // Safe handling for focus areas
             $focus_areas = '';
             if (isset($appointment['focus_areas'])) {
-                $focus_areas = is_array($appointment['focus_areas']) 
-                    ? implode(', ', $appointment['focus_areas']) 
-                    : $appointment['focus_areas'];
+                if (is_array($appointment['focus_areas'])) {
+                    $sanitized_areas = array_map('sanitize_text_field', $appointment['focus_areas']);
+                    $focus_areas = implode(', ', $sanitized_areas);
+                } else {
+                    $focus_areas = sanitize_text_field($appointment['focus_areas']);
+                }
+                // Limit length
+                $focus_areas = substr($focus_areas, 0, 100);
             }
             
-            // Create event update object
+            // Safe handling for pressure preference
+            $pressure_preference = '';
+            if (isset($appointment['pressure_preference'])) {
+                $pressure_preference = sanitize_text_field($appointment['pressure_preference']);
+                // Limit length
+                $pressure_preference = substr($pressure_preference, 0, 50);
+            }
+            
+            // Safe handling for special requests
+            $special_requests = '';
+            if (isset($appointment['special_requests'])) {
+                $special_requests = sanitize_textarea_field($appointment['special_requests']);
+                // Limit length
+                $special_requests = substr($special_requests, 0, 500);
+            }
+            
+            // Create event update object with sanitized data
             $event = [
-                'subject' => 'Massage - ' . $appointment['duration'] . ' min (' . $appointment['full_name'] . ')',
+                'subject' => 'Massage - ' . intval($appointment['duration']) . ' min (' . sanitize_text_field($appointment['full_name']) . ')',
                 'body' => [
                     'contentType' => 'text',
-                    'content' => "Client: {$appointment['full_name']}\nEmail: {$appointment['email']}\nPhone: {$appointment['phone']}\nFocus Areas: {$focus_areas}\nPressure: {$appointment['pressure_preference']}\nSpecial Requests: {$appointment['special_requests']}"
+                    'content' => "Client: " . sanitize_text_field($appointment['full_name']) . 
+                                "\nEmail: " . sanitize_email($appointment['email']) . 
+                                "\nPhone: " . sanitize_text_field($appointment['phone']) . 
+                                "\nFocus Areas: {$focus_areas}" . 
+                                "\nPressure: {$pressure_preference}" . 
+                                "\nSpecial Requests: {$special_requests}"
                 ],
                 'start' => [
                     'dateTime' => $start_datetime->format('Y-m-d\TH:i:s'),
@@ -318,7 +431,7 @@ class Massage_Booking_Calendar {
             
             // Call Microsoft Graph API to update event
             $response = wp_remote_request(
-                $this->graph_endpoint . "me/events/{$event_id}",
+                $this->graph_endpoint . "me/events/" . sanitize_text_field($event_id),
                 [
                     'method' => 'PATCH',
                     'headers' => [
@@ -397,7 +510,7 @@ class Massage_Booking_Calendar {
         try {
             // Call Microsoft Graph API to get event
             $response = wp_remote_get(
-                $this->graph_endpoint . "me/events/{$event_id}",
+                $this->graph_endpoint . "me/events/" . sanitize_text_field($event_id),
                 [
                     'headers' => [
                         'Authorization' => 'Bearer ' . $this->access_token
