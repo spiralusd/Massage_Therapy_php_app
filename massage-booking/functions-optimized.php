@@ -239,6 +239,9 @@ function massage_booking_register_optimized_assets() {
     if (is_page_template('page-booking.php') || 
         (is_page() && get_post_meta(get_the_ID(), '_wp_page_template', true) === MASSAGE_BOOKING_PLUGIN_DIR . 'public/templates/page-booking.php')) {
         
+        // Make sure jQuery is loaded first
+        wp_enqueue_script('jquery');
+        
         // Register CSS
         wp_register_style(
             'massage-booking-form-style',
@@ -269,7 +272,7 @@ function massage_booking_register_optimized_assets() {
             true
         );
         
-        // Register jQuery form handler
+        // Register jQuery form handler 
         wp_register_script(
             'massage-booking-jquery-form',
             MASSAGE_BOOKING_PLUGIN_URL . 'public/js/jquery-form-handler.js',
@@ -279,7 +282,6 @@ function massage_booking_register_optimized_assets() {
         );
         
         // Enqueue everything
-        wp_enqueue_script('jquery');
         wp_enqueue_style('massage-booking-form-style');
         wp_enqueue_script('massage-booking-form-script');
         wp_enqueue_script('massage-booking-api-connector');
@@ -564,6 +566,12 @@ function massage_booking_simple_appointment_handler() {
     // Basic setup and debugging
     error_reporting(E_ALL);
     ini_set('display_errors', 0); // Don't output to browser, but still log errors
+    
+    // Force JSON response
+    header('Content-Type: application/json');
+    
+    // Log incoming request for debugging
+    error_log('Massage Booking AJAX request received: ' . print_r($_POST, true));
     
     // Verify security nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'wp_rest')) {

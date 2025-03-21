@@ -9,8 +9,11 @@ jQuery(document).ready(function($) {
     
     // Handle form submission
     appointmentForm.on('submit', function(e) {
-        // Prevent default form submission
+        // Prevent default form submission AND stop event propagation to prevent
+        // other handlers from executing (like the one in api-connector-optimized.js)
         e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         
         console.log('Form submission intercepted by jQuery handler');
         
@@ -64,7 +67,7 @@ jQuery(document).ready(function($) {
             focusAreas.push($(this).val());
         });
         
-        // Prepare form data
+        // Prepare form data - Use simple key/value pairs to avoid JSON stringification issues
         const formData = {
             action: 'massage_booking_create_appointment',
             nonce: massageBookingAPI.nonce,
@@ -72,8 +75,8 @@ jQuery(document).ready(function($) {
             email: $('#email').val(),
             phone: $('#phone').val(),
             appointmentDate: $('#appointmentDate').val(),
-            startTime: selectedTimeSlot.data('time'),
-            endTime: selectedTimeSlot.data('end-time'),
+            startTime: selectedTimeSlot.attr('data-time'),  // Use attr instead of data for consistency
+            endTime: selectedTimeSlot.attr('data-end-time'),
             duration: selectedDuration.val(),
             focusAreas: JSON.stringify(focusAreas),
             pressurePreference: $('#pressurePreference').val(),
@@ -82,12 +85,15 @@ jQuery(document).ready(function($) {
         
         console.log('Submitting appointment data via jQuery AJAX:', formData);
         
-        // Submit via jQuery AJAX
+        // Submit via jQuery AJAX - with explicit settings for maximum compatibility
         $.ajax({
             url: massageBookingAPI.ajaxUrl,
             type: 'POST',
             data: formData,
             dataType: 'json',
+            cache: false,
+            processData: true,  // Process data as form fields
+            contentType: 'application/x-www-form-urlencoded', // Standard form content type
             success: function(response) {
                 // Remove loading overlay
                 $('#loadingOverlay').remove();
@@ -109,7 +115,7 @@ jQuery(document).ready(function($) {
                     $('#duration60').closest('.radio-option').addClass('selected');
                 } else {
                     // Show error message
-                    alert('Error: ' + (response.data?.message || 'Failed to book appointment'));
+                    alert('Error: ' + (response.data && response.data.message ? response.data.message : 'Failed to book appointment'));
                 }
             },
             error: function(xhr, status, error) {
@@ -117,17 +123,36 @@ jQuery(document).ready(function($) {
                 $('#loadingOverlay').remove();
                 
                 console.error('AJAX Error:', status, error);
-                console.log('Server response:', xhr.responseText);
                 
-                // Try to parse response if possible
+                // Try to extract more info from response
                 let errorMessage = 'An error occurred while booking your appointment.';
+                
+                // Log the raw response for debugging
+                console.log('Raw server response status:', xhr.status);
+                console.log('Raw server response text:', xhr.responseText);
+                
                 try {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.data && response.data.message) {
-                        errorMessage = response.data.message;
+                    // Try to parse as JSON first
+                    const jsonResponse = JSON.parse(xhr.responseText);
+                    if (jsonResponse.data && jsonResponse.data.message) {
+                        errorMessage = jsonResponse.data.message;
+                    } else if (jsonResponse.message) {
+                        errorMessage = jsonResponse.message;
                     }
                 } catch (e) {
-                    // Could not parse JSON, use default message
+                    // Not valid JSON, try to extract error from HTML
+                    console.log('Response is not valid JSON:', e);
+                    
+                    // Look for common error patterns in HTML response
+                    const responseText = xhr.responseText;
+                    if (responseText.includes('Fatal error')) {
+                        const errorStart = responseText.indexOf('Fatal error');
+                        const errorEnd = responseText.indexOf('</b>', errorStart);
+                        if (errorStart > -1 && errorEnd > -1) {
+                            errorMessage = responseText.substring(errorStart, errorEnd + 4)
+                                .replace(/<[^>]*>/g, '');
+                        }
+                    }
                 }
                 
                 alert('Error: ' + errorMessage + ' Please try again or contact us directly.');

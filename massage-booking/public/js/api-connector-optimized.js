@@ -564,6 +564,7 @@ jQuery(document).ready(function($) {
     }
     
     // Override the form submission
+    /*
     appointmentForm.addEventListener('submit', async function(e) {
         // Prevent the default form submission
         e.preventDefault();
@@ -717,12 +718,13 @@ jQuery(document).ready(function($) {
                 throw new Error(responseData.message || 'Failed to book appointment');
             }
             */
-        } catch (error) {
+   /*     } catch (error) {
             if (hideLoader) hideLoader(loader);
             console.error('Error booking appointment:', error);
             alert('Error: ' + error.message);
         }
-    }, true); // Using capture phase to ensure our handler runs first
+    }, true); // Using capture phase to ensure our handler runs first */
+    console.log('Form submission will be handled by jQuery handler in jquery-form-handler.js');
 
     // Helper function to reset the form after successful submission
     function resetForm() {
