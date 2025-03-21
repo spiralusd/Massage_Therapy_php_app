@@ -10,22 +10,37 @@ jQuery(document).ready(function($) {
     // Handle form submission
     appointmentForm.on('submit', function(e) {
         // Prevent default form submission AND stop event propagation to prevent
-        // other handlers from executing (like the one in api-connector-optimized.js)
+        // other handlers from executing
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
         
         console.log('Form submission intercepted by jQuery handler');
         
-        // Basic validation
+        // Improved validation logic
         let valid = true;
+        let errorFields = [];
         
-        // Required fields
-        const requiredFields = ['fullName', 'email', 'phone', 'appointmentDate'];
+        // Required fields with more detailed checking
+        const requiredFields = [
+            {id: 'fullName', label: 'Full Name'},
+            {id: 'email', label: 'Email Address'},
+            {id: 'phone', label: 'Phone Number'},
+            {id: 'appointmentDate', label: 'Appointment Date'}
+        ];
+        
         requiredFields.forEach(field => {
-            const input = $('#' + field);
-            if (!input.val().trim()) {
+            const input = $('#' + field.id);
+            console.log('Checking field:', field.id, 'Value:', input.val());
+            
+            if (!input.length) {
+                console.error('Field not found in DOM:', field.id);
+                return;
+            }
+            
+            if (!input.val() || input.val().trim() === '') {
                 input.css('border-color', 'red');
+                errorFields.push(field.label);
                 valid = false;
             } else {
                 input.css('border-color', '');
@@ -33,33 +48,38 @@ jQuery(document).ready(function($) {
         });
         
         // Check duration is selected
-        if (!$('input[name="duration"]:checked').length) {
+        const selectedDuration = $('input[name="duration"]:checked');
+        console.log('Duration selected:', selectedDuration.length, selectedDuration.val());
+        if (!selectedDuration.length) {
             $('#serviceDuration').css('border-color', 'red');
+            errorFields.push('Service Duration');
             valid = false;
         } else {
             $('#serviceDuration').css('border-color', '');
         }
         
         // Check time slot is selected
-        if (!$('.time-slot.selected').length) {
+        const selectedTimeSlot = $('.time-slot.selected');
+        console.log('Time slot selected:', selectedTimeSlot.length);
+        if (!selectedTimeSlot.length) {
             $('#timeSlots').css('border-color', 'red');
+            errorFields.push('Time Slot');
             valid = false;
         } else {
             $('#timeSlots').css('border-color', '');
         }
         
         if (!valid) {
-            alert('Please fill in all required fields.');
+            console.warn('Form validation failed. Missing fields:', errorFields);
+            alert('Please fill in all required fields: ' + errorFields.join(', '));
             return;
         }
+        
+        console.log('Form validation passed');
         
         // Show loading state
         $('body').append('<div id="loadingOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: flex; justify-content: center; align-items: center; z-index: 9999;"><div style="text-align: center;"><div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; margin: 0 auto; animation: spin 2s linear infinite;"></div><p style="margin-top: 10px;">Processing your appointment...</p></div></div>');
         $('<style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>').appendTo('head');
-        
-        // Get selected values
-        const selectedTimeSlot = $('.time-slot.selected');
-        const selectedDuration = $('input[name="duration"]:checked');
         
         // Get focus areas
         const focusAreas = [];
@@ -124,13 +144,12 @@ jQuery(document).ready(function($) {
                 
                 console.error('AJAX Error:', status, error);
                 
-                // Try to extract more info from response
-                let errorMessage = 'An error occurred while booking your appointment.';
-                
                 // Log the raw response for debugging
                 console.log('Raw server response status:', xhr.status);
                 console.log('Raw server response text:', xhr.responseText);
                 
+                // Try to extract more info from response
+                let errorMessage = 'An error occurred while booking your appointment.';
                 try {
                     // Try to parse as JSON first
                     const jsonResponse = JSON.parse(xhr.responseText);

@@ -65,6 +65,7 @@ require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-settings.php';
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-encryption-optimized.php';
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-audit-log-optimized.php';
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/database-extension.php';
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'debug.php';
 
 // Include optimized functions file
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'functions-optimized.php';

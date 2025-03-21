@@ -724,7 +724,8 @@ jQuery(document).ready(function($) {
             alert('Error: ' + error.message);
         }
     }, true); // Using capture phase to ensure our handler runs first */
-    console.log('Form submission will be handled by jQuery handler in jquery-form-handler.js');
+    console.log('Form submission handler in api-connector-optimized.js is disabled');
+    console.log('Form submission will be handled by jquery-form-handler.js');
 
     // Helper function to reset the form after successful submission
     function resetForm() {
