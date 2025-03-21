@@ -4,344 +4,389 @@
  * This is the optimized JavaScript for the booking form.
  * The api-connector.js file will override some of these functions
  * to connect to the WordPress backend.
+ * Enhanced Date & Time Selection for Massage Booking
  */
 
 document.addEventListener('DOMContentLoaded', () => {
     // Set minimum date to today
     const today = new Date();
     const dateInput = document.getElementById('appointmentDate');
+    if(!dateInput) return;
+    
+    // Set minimum date to today
     dateInput.min = today.toISOString().split('T')[0];
     
     /**
-     * Validate available days when selecting a date
+     * Disable unavailable days in the date picker
+     * This uses the data-available-days attribute to determine which days are available
      */
-    const setAvailableDays = () => {
-        const availableDays = dateInput.getAttribute('data-available-days')?.split(',').map(Number) || [1, 2, 3, 4, 5];
+    const disableUnavailableDays = () => {
+        const availableDaysStr = dateInput.getAttribute('data-available-days');
+        if (!availableDaysStr) return;
         
+        // Convert to array of numbers
+        const availableDays = availableDaysStr.split(',').map(Number);
+        
+        // Create a new Date Input with enhanced functionality
         dateInput.addEventListener('input', function() {
-            const selectedDate = new Date(this.value);
-            const dayOfWeek = selectedDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-            
-            if (!availableDays.includes(dayOfWeek)) {
-                alert('Sorry, appointments are not available on this day. Please select a different date.');
-                this.value = '';
-            } else {
-                // When a valid date is selected, fetch available time slots
-                const selectedDuration = document.querySelector('input[name="duration"]:checked')?.value || '60';
-                fetchAvailableTimeSlots(this.value, selectedDuration);
-            }
+            validateSelectedDate(this, availableDays);
         });
-    };
-    
-    // Handle service duration selection
-    const initDurationSelection = () => {
-        const radioOptions = document.querySelectorAll('.radio-option');
-        radioOptions.forEach(option => {
-            option.addEventListener('click', function() {
-                // Clear previous selection
-                radioOptions.forEach(opt => opt.classList.remove('selected'));
-                
-                // Select this option
-                this.classList.add('selected');
-                
-                // Check the radio button
-                const radio = this.querySelector('input[type="radio"]');
-                radio.checked = true;
-                
-                // Update summary
-                updateSummary();
-                
-                // Re-fetch available slots if a date is already selected
-                const selectedDate = dateInput.value;
-                if (selectedDate) {
-                    fetchAvailableTimeSlots(selectedDate, radio.value);
-                }
-            });
+        
+        // Also validate on focus out to handle direct input
+        dateInput.addEventListener('blur', function() {
+            validateSelectedDate(this, availableDays);
         });
-    };
-    
-    // Handle focus areas selection
-    const initFocusAreaSelection = () => {
-        const checkboxOptions = document.querySelectorAll('.checkbox-option');
-        checkboxOptions.forEach(option => {
-            option.addEventListener('click', function() {
-                this.classList.toggle('selected');
-                
-                // Toggle the checkbox
-                const checkbox = this.querySelector('input[type="checkbox"]');
-                checkbox.checked = !checkbox.checked;
-                
-                // Update summary
-                updateSummary();
-            });
-        });
+        
+        // Add the date picker event listener
+        enhanceDatePicker(dateInput, availableDays);
     };
     
     /**
-     * This function will be overridden by api-connector.js
-     * to fetch time slots from the server
-     * @param {string} date - Selected date
-     * @param {string} duration - Selected duration in minutes
-     * @returns {Promise} - Promise resolving to available time slots
+     * Validate a selected date against available days
      */
-    const fetchAvailableTimeSlots = async (date, duration) => {
-        console.log(`Fetching time slots for ${date} with duration ${duration}`);
+    const validateSelectedDate = (dateElement, availableDays) => {
+        if (!dateElement.value) return;
         
-        // This is a placeholder that will be replaced by api-connector.js
-        // In a standalone version, this would generate slots based on hardcoded rules
+        const selectedDate = new Date(dateElement.value);
+        const dayOfWeek = selectedDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
         
+        if (!availableDays.includes(dayOfWeek)) {
+            alert('Sorry, appointments are not available on this day. Please select a different date.');
+            dateElement.value = '';
+        } else {
+            // Valid date selected, fetch available time slots
+            const selectedDuration = document.querySelector('input[name="duration"]:checked')?.value || '60';
+            if (typeof window.fetchAvailableTimeSlots === 'function') {
+                window.fetchAvailableTimeSlots(dateElement.value, selectedDuration);
+            }
+        }
+    };
+    
+    /**
+     * Enhanced date picker implementation to handle unavailable days
+     */
+    const enhanceDatePicker = (dateElement, availableDays) => {
+        // Add custom date picker behavior using native HTML date input
+        // This adds extra functionality without replacing the native control
+        
+        // Mark unavailable days visually (requires browser support)
+        if ('showPicker' in dateElement) { // Modern browsers
+            // Create a style element for our custom date styles
+            const styleEl = document.createElement('style');
+            styleEl.textContent = `
+                /* Attempt to gray out unavailable days - browser support varies */
+                input[type="date"]::-webkit-calendar-picker-indicator {
+                    background-color: transparent;
+                    cursor: pointer;
+                }
+                
+                /* Custom styling for the date input */
+                input[type="date"] {
+                    position: relative;
+                    cursor: pointer;
+                }
+                
+                input[type="date"]:invalid {
+                    border-color: #dc3545;
+                }
+            `;
+            document.head.appendChild(styleEl);
+            
+            // Add a note about available days
+            const availableDayNames = availableDays.map(day => {
+                const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                return days[day];
+            }).join(', ');
+            
+            const noteElement = document.createElement('small');
+            noteElement.textContent = `Available days: ${availableDayNames}`;
+            noteElement.style.display = 'block';
+            noteElement.style.marginTop = '5px';
+            noteElement.style.color = '#666';
+            
+            // Replace existing note if found, otherwise append
+            const existingNote = dateElement.nextElementSibling;
+            if (existingNote && existingNote.tagName.toLowerCase() === 'small') {
+                existingNote.textContent = noteElement.textContent;
+            } else {
+                dateElement.parentNode.insertBefore(noteElement, dateElement.nextSibling);
+            }
+        }
+    };
+    
+    // Call our enhancer function
+    disableUnavailableDays();
+    
+    /**
+     * Improved time slot fetching with better error handling
+     */
+    window.fetchAvailableTimeSlots = async function(date, duration) {
+        // Show loading state
         const slotsContainer = document.getElementById('timeSlots');
+        if (!slotsContainer) return;
+        
         slotsContainer.innerHTML = '<p>Loading available times...</p>';
+        slotsContainer.classList.add('loading');
         
         try {
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Simulate some available slots
-            slotsContainer.innerHTML = '';
-            
-            const startHour = 9; // 9 AM
-            const endHour = 17;  // 5 PM
-            
-            for (let hour = startHour; hour <= endHour; hour++) {
-                // Create time slots for each hour
-                const time = `${hour}:00`;
-                const displayTime = `${hour > 12 ? hour - 12 : hour}:00 ${hour >= 12 ? 'PM' : 'AM'}`;
-                
-                const slotElement = document.createElement('div');
-                slotElement.className = 'time-slot';
-                slotElement.setAttribute('data-time', time);
-                
-                // Calculate end time based on duration
-                const endHour = Math.floor(hour + parseInt(duration) / 60);
-                const endMinutes = (parseInt(duration) % 60);
-                const endTime = `${endHour}:${endMinutes.toString().padStart(2, '0')}`;
-                
-                slotElement.setAttribute('data-end-time', endTime);
-                slotElement.textContent = displayTime;
-                
-                // Add click event
-                slotElement.addEventListener('click', function() {
-                    // Clear previous selection
-                    document.querySelectorAll('.time-slot').forEach(s => s.classList.remove('selected'));
-                    
-                    // Select this slot
-                    this.classList.add('selected');
-                    
-                    // Update summary
-                    updateSummary();
+            // Generate a new nonce for security
+            let nonce = '';
+            try {
+                // Try to get a nonce from the server first
+                const nonceResponse = await fetch(massageBookingAPI.ajaxUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({
+                        action: 'generate_booking_nonce',
+                        booking_action: 'check_time_slots',
+                        _wpnonce: massageBookingAPI.nonce
+                    })
                 });
                 
-                slotsContainer.appendChild(slotElement);
+                const nonceData = await nonceResponse.json();
+                nonce = nonceData.nonce || '';
+            } catch(e) {
+                console.error('Failed to generate nonce:', e);
+                // Continue with the main nonce if specific nonce generation fails
             }
+            
+            // Fetch available slots from WordPress API
+            const response = await fetch(
+                `${massageBookingAPI.restUrl}available-slots?date=${date}&duration=${duration}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'X-WP-Nonce': massageBookingAPI.nonce,
+                        'X-Booking-Request-Nonce': nonce
+                    }
+                }
+            );
+            
+            if (!response.ok) {
+                throw new Error(`Failed to load time slots (HTTP ${response.status})`);
+            }
+            
+            const data = await response.json();
+            console.log('Available slots from WordPress:', data);
+            
+            // Update the UI
+            displayTimeSlots(data, slotsContainer);
+            
+            // Return the data for any other components that need it
+            return data;
         } catch (error) {
             console.error('Error fetching time slots:', error);
-            slotsContainer.innerHTML = '<p>Error loading available times. Please try again.</p>';
-        }
-    };
-    
-    /**
-     * Update appointment summary
-     */
-    const updateSummary = () => {
-        const summary = document.getElementById('bookingSummary');
-        const selectedDuration = document.querySelector('input[name="duration"]:checked');
-        const selectedTime = document.querySelector('.time-slot.selected');
-        const selectedDate = dateInput.value;
-        
-        if (selectedDuration && selectedTime && selectedDate) {
-            // Show summary
-            summary.classList.add('visible');
             
-            // Update service
-            const durationValue = selectedDuration.value;
-            const durationPrice = selectedDuration.closest('.radio-option').getAttribute('data-price');
-            document.getElementById('summaryService').textContent = `${durationValue} Minutes Massage ($${durationPrice})`;
+            // Show error message with retry button
+            slotsContainer.innerHTML = `
+                <p>Error loading available times. Please try again.</p>
+                <button class="retry-button">Retry</button>
+            `;
             
-            // Update focus areas
-            const selectedFocusAreas = Array.from(document.querySelectorAll('input[name="focus"]:checked'))
-                .map(checkbox => checkbox.value);
-            document.getElementById('summaryFocusAreas').textContent = selectedFocusAreas.length > 0 
-                ? selectedFocusAreas.join(', ') 
-                : 'No specific areas selected';
-            
-            // Format date
-            const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-            
-            // Update date & time
-            document.getElementById('summaryDateTime').textContent = `${formattedDate} at ${selectedTime.textContent}`;
-            
-            // Update price
-            document.getElementById('summaryPrice').textContent = `$${durationPrice}`;
-        } else {
-            // Hide summary if not all required elements are selected
-            summary.classList.remove('visible');
-        }
-    };
-    
-    /**
-     * Form validation function
-     * @returns {boolean} - True if form is valid, false otherwise
-     */
-    const validateForm = () => {
-        let valid = true;
-        const requiredFields = ['fullName', 'email', 'phone', 'appointmentDate'];
-        
-        // Check required fields
-        requiredFields.forEach(field => {
-            const element = document.getElementById(field);
-            if (!element.value) {
-                element.style.borderColor = 'red';
-                element.setAttribute('aria-invalid', 'true');
-                valid = false;
-            } else {
-                element.style.borderColor = '';
-                element.removeAttribute('aria-invalid');
+            // Add retry functionality
+            const retryButton = slotsContainer.querySelector('.retry-button');
+            if (retryButton) {
+                retryButton.addEventListener('click', () => {
+                    window.fetchAvailableTimeSlots(date, duration);
+                });
             }
+            
+            // Return empty data structure
+            return { available: false, slots: [] };
+        } finally {
+            // Remove loading state
+            slotsContainer.classList.remove('loading');
+        }
+    };
+    
+    /**
+     * Display time slots in the UI
+     */
+    const displayTimeSlots = (data, container) => {
+        // Clear the container
+        container.innerHTML = '';
+        
+        // Check if we have available slots
+        if (!data.available || !data.slots || data.slots.length === 0) {
+            container.innerHTML = '<p>No appointments available on this date.</p>';
+            return;
+        }
+        
+        // Sort slots by time before displaying
+        const sortedSlots = [...data.slots].sort((a, b) => {
+            return a.startTime.localeCompare(b.startTime);
         });
         
-        // Check service duration
-        if (!document.querySelector('input[name="duration"]:checked')) {
-            document.getElementById('serviceDuration').style.borderColor = 'red';
-            valid = false;
-        } else {
-            document.getElementById('serviceDuration').style.borderColor = '';
-        }
-        
-        // Check time slot
-        if (!document.querySelector('.time-slot.selected')) {
-            document.getElementById('timeSlots').style.borderColor = 'red';
-            valid = false;
-        } else {
-            document.getElementById('timeSlots').style.borderColor = '';
-        }
-        
-        return valid;
-    };
-    
-    // Form submission - this will be overridden by api-connector.js
-    const initFormSubmission = () => {
-        const form = document.getElementById('appointmentForm');
-        if (form) {
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
+        // Create time slot elements
+        sortedSlots.forEach(slot => {
+            const slotElement = document.createElement('div');
+            slotElement.className = 'time-slot';
+            slotElement.setAttribute('data-time', slot.startTime);
+            slotElement.setAttribute('data-end-time', slot.endTime);
+            slotElement.setAttribute('role', 'option');
+            slotElement.setAttribute('aria-selected', 'false');
+            slotElement.textContent = slot.displayTime;
+            
+            // Add click event
+            slotElement.addEventListener('click', function() {
+                // Clear previous selection
+                document.querySelectorAll('.time-slot').forEach(s => {
+                    s.classList.remove('selected');
+                    s.setAttribute('aria-selected', 'false');
+                });
                 
-                // Validate form
-                if (!validateForm()) {
-                    return;
+                // Select this slot
+                this.classList.add('selected');
+                this.setAttribute('aria-selected', 'true');
+                
+                // Update appointment summary
+                if (typeof window.updateSummary === 'function') {
+                    window.updateSummary();
                 }
                 
-                // Show mock success message - this will be replaced by actual API call
-                alert('Your appointment has been booked! A confirmation email will be sent shortly.');
-                
-                // Reset form
-                this.reset();
-                document.querySelectorAll('.radio-option, .checkbox-option, .time-slot').forEach(el => {
-                    el.classList.remove('selected');
-                });
-                document.getElementById('bookingSummary').classList.remove('visible');
-                document.getElementById('timeSlots').innerHTML = '<p>Please select a date to see available time slots.</p>';
+                // Save selection in form data
+                const formData = JSON.parse(sessionStorage.getItem('massageBookingFormData') || '{}');
+                formData.selectedTimeSlot = slot.startTime;
+                formData.selectedEndTime = slot.endTime;
+                sessionStorage.setItem('massageBookingFormData', JSON.stringify(formData));
             });
+            
+            container.appendChild(slotElement);
+        });
+    };
+    
+    /**
+     * Initialize the form with saved session data
+     */
+    const initFormWithSessionData = () => {
+        try {
+            const savedData = sessionStorage.getItem('massageBookingFormData');
+            if (savedData) {
+                const formData = JSON.parse(savedData);
+                
+                // Restore text inputs
+                ['fullName', 'email', 'phone', 'appointmentDate', 'specialRequests'].forEach(field => {
+                    const input = document.getElementById(field);
+                    if (input && formData[field]) {
+                        input.value = formData[field];
+                    }
+                });
+                
+                // Restore radio buttons
+                if (formData.duration) {
+                    const radio = document.querySelector(`input[name="duration"][value="${formData.duration}"]`);
+                    if (radio) {
+                        radio.checked = true;
+                        // Also update the selected class
+                        const radioOption = radio.closest('.radio-option');
+                        if (radioOption) {
+                            document.querySelectorAll('.radio-option').forEach(opt => 
+                                opt.classList.remove('selected'));
+                            radioOption.classList.add('selected');
+                        }
+                    }
+                }
+                
+                // Restore pressure preference
+                if (formData.pressurePreference) {
+                    const select = document.getElementById('pressurePreference');
+                    if (select) {
+                        select.value = formData.pressurePreference;
+                    }
+                }
+                
+                // Restore date and fetch time slots
+                if (formData.appointmentDate) {
+                    const dateField = document.getElementById('appointmentDate');
+                    if (dateField) {
+                        dateField.value = formData.appointmentDate;
+                        
+                        // Fetch time slots for this date
+                        const duration = formData.duration || 
+                            document.querySelector('input[name="duration"]:checked')?.value || '60';
+                        
+                        // Use setTimeout to ensure the date is set before fetching slots
+                        setTimeout(() => {
+                            if (typeof window.fetchAvailableTimeSlots === 'function') {
+                                window.fetchAvailableTimeSlots(formData.appointmentDate, duration)
+                                    .then(() => {
+                                        // After slots are loaded, restore selected time slot
+                                        if (formData.selectedTimeSlot) {
+                                            setTimeout(() => {
+                                                const slot = document.querySelector(`.time-slot[data-time="${formData.selectedTimeSlot}"]`);
+                                                if (slot) {
+                                                    slot.click();
+                                                }
+                                            }, 100);
+                                        }
+                                    });
+                            }
+                        }, 100);
+                    }
+                }
+                
+                // Restore focus areas
+                if (formData.focusAreas && Array.isArray(formData.focusAreas)) {
+                    formData.focusAreas.forEach(area => {
+                        const checkbox = document.querySelector(`input[name="focus"][value="${area}"]`);
+                        if (checkbox) {
+                            checkbox.checked = true;
+                            // Update the selected class
+                            const checkOption = checkbox.closest('.checkbox-option');
+                            if (checkOption) {
+                                checkOption.classList.add('selected');
+                            }
+                        }
+                    });
+                }
+                
+                // Update summary if needed
+                if (typeof window.updateSummary === 'function') {
+                    setTimeout(window.updateSummary, 200);
+                }
+            }
+        } catch (e) {
+            console.error('Error restoring form state:', e);
         }
     };
     
-    // Save form state to session storage
+    // Call initialization functions
+    initFormWithSessionData();
+    
+    // Save form state on changes
     const saveFormState = () => {
-        const formElements = document.querySelectorAll('#appointmentForm input, #appointmentForm select, #appointmentForm textarea');
-        formElements.forEach(element => {
-            element.addEventListener('change', () => {
-                const formData = {};
-                formElements.forEach(el => {
-                    if (el.type === 'radio' || el.type === 'checkbox') {
-                        if (el.checked) {
-                            formData[el.name] = el.value;
-                        }
-                    } else {
-                        formData[el.name] = el.value;
-                    }
-                });
+        const form = document.getElementById('appointmentForm');
+        if (!form) return;
+        
+        // Get all form inputs
+        const inputs = form.querySelectorAll('input, select, textarea');
+        
+        // For each input, add a change listener
+        inputs.forEach(input => {
+            input.addEventListener('change', () => {
+                const formData = JSON.parse(sessionStorage.getItem('massageBookingFormData') || '{}');
+                
+                if (input.type === 'radio' && input.checked) {
+                    // Radio button
+                    formData[input.name] = input.value;
+                } else if (input.type === 'checkbox') {
+                    // Checkbox - gather all checked values for this name
+                    const checkboxes = Array.from(
+                        document.querySelectorAll(`input[type="checkbox"][name="${input.name}"]:checked`)
+                    ).map(cb => cb.value);
+                    
+                    formData[input.name] = checkboxes;
+                } else {
+                    // Regular input
+                    formData[input.id || input.name] = input.value;
+                }
+                
+                // Save to session storage
                 sessionStorage.setItem('massageBookingFormData', JSON.stringify(formData));
             });
         });
     };
     
-    // Restore form state from session storage
-    const restoreFormState = () => {
-        const savedData = sessionStorage.getItem('massageBookingFormData');
-        if (savedData) {
-            const formData = JSON.parse(savedData);
-            Object.keys(formData).forEach(key => {
-                const element = document.querySelector(`[name="${key}"]`);
-                if (element) {
-                    if (element.type === 'radio' || element.type === 'checkbox') {
-                        document.querySelector(`[name="${key}"][value="${formData[key]}"]`).checked = true;
-                        
-                        // Also update the selected class
-                        const container = element.closest('.radio-option, .checkbox-option');
-                        if (container) {
-                            container.classList.add('selected');
-                        }
-                    } else {
-                        element.value = formData[key];
-                    }
-                }
-            });
-            
-            // If date was selected, fetch time slots
-            if (formData.appointmentDate) {
-                const selectedDuration = document.querySelector('input[name="duration"]:checked')?.value || '60';
-                fetchAvailableTimeSlots(formData.appointmentDate, selectedDuration);
-            }
-        }
-    };
-    
-    // Add ARIA attributes for accessibility
-    const enhanceAccessibility = () => {
-        // Add role and aria-label to main sections
-        document.getElementById('serviceDuration').setAttribute('role', 'radiogroup');
-        document.getElementById('serviceDuration').setAttribute('aria-label', 'Service Duration Options');
-        
-        document.getElementById('focusAreas').setAttribute('role', 'group');
-        document.getElementById('focusAreas').setAttribute('aria-label', 'Focus Areas Options');
-        
-        document.getElementById('timeSlots').setAttribute('role', 'listbox');
-        document.getElementById('timeSlots').setAttribute('aria-label', 'Available Time Slots');
-        
-        // Make sure all inputs have proper labels
-        const inputs = document.querySelectorAll('input, select, textarea');
-        inputs.forEach(input => {
-            if (!input.getAttribute('aria-label') && !input.getAttribute('id')) {
-                input.setAttribute('aria-label', input.getAttribute('name'));
-            }
-        });
-    };
-    
-    // Initialize the form
-    const init = () => {
-        setAvailableDays();
-        initDurationSelection();
-        initFocusAreaSelection();
-        initFormSubmission();
-        saveFormState();
-        restoreFormState();
-        enhanceAccessibility();
-    };
-    
-    init();
-    
-    // Make functions available globally for api-connector.js to override
-    window.fetchAvailableTimeSlots = fetchAvailableTimeSlots;
-    window.updateSummary = updateSummary;
-    window.validateForm = validateForm;
-    window.setAvailableDays = setAvailableDays;
-    window.loadSettings = function() {
-        // Placeholder function to be overridden by api-connector.js
-        console.log('Loading settings (default implementation)');
-        return Promise.resolve({});
-    };
+    // Initialize form state saving
+    saveFormState();
 });
