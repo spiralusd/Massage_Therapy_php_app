@@ -87,6 +87,9 @@ if (massage_booking_is_admin_area()) {
     require_once MASSAGE_BOOKING_PLUGIN_DIR . 'public/shortcodes.php';
 }
 
+// Include Microsoft Graph Authentication Handler
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-ms-graph-auth.php';
+
 // Always include the appointments class with REST API endpoints
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-appointments.php';
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-calendar-optimized.php';
@@ -94,8 +97,6 @@ require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-calendar-optimized.php
 // Include the new email verification integration
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/thank-you-page-integration.php';
 
-// Include Microsoft Graph Authentication Handler
-require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-ms-graph-auth.php';
 
 // Include the emails class
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/emails-optimized.php';

@@ -1,6 +1,10 @@
 <?php
 /**
  * Fixed Calendar Integration for Office 365
+ * 
+ * This file fixes the authentication issue with Microsoft Graph API.
+ * Problem: Using /me endpoint with client credentials flow, which is incompatible.
+ * Solution: Use delegated authentication flow via MS_Graph_Auth class.
  */
 
 // Exit if accessed directly
@@ -10,24 +14,14 @@ if (!defined('ABSPATH')) {
 
 class Massage_Booking_Calendar {
     /**
-     * Microsoft Graph API client ID
+     * Microsoft Graph API auth handler
      */
-    private $client_id;
+    private $ms_graph_auth;
     
     /**
-     * Microsoft Graph API client secret
+     * Calendar user email
      */
-    private $client_secret;
-    
-    /**
-     * Microsoft Graph API tenant ID
-     */
-    private $tenant_id;
-    
-    /**
-     * Microsoft Graph API access token
-     */
-    private $access_token;
+    private $user_email;
     
     /**
      * Microsoft Graph API endpoint
@@ -51,9 +45,12 @@ class Massage_Booking_Calendar {
     public function __construct() {
         // Get settings
         $settings = new Massage_Booking_Settings();
-        $this->client_id = $settings->get_setting('ms_client_id');
-        $this->client_secret = $settings->get_setting('ms_client_secret');
-        $this->tenant_id = $settings->get_setting('ms_tenant_id');
+        
+        // Use MS_Graph_Auth class for delegated authentication
+        $this->ms_graph_auth = new Massage_Booking_MS_Graph_Auth();
+        
+        // Get business email for calendar operations
+        $this->user_email = $settings->get_setting('business_email', get_option('admin_email'));
         
         // Enable debug mode if WP_DEBUG is enabled
         $this->debug = defined('WP_DEBUG') && WP_DEBUG;
@@ -65,7 +62,8 @@ class Massage_Booking_Calendar {
         if ($this->debug) {
             $this->log_action('initialize', [
                 'configured' => $this->is_configured(),
-                'timezone' => $this->timezone
+                'timezone' => $this->timezone,
+                'user_email' => $this->user_email
             ]);
         }
     }
@@ -113,7 +111,13 @@ class Massage_Booking_Calendar {
      * @return bool True if configured, false otherwise
      */
     public function is_configured() {
-        return (!empty($this->client_id) && !empty($this->client_secret) && !empty($this->tenant_id));
+        // Check if access token can be obtained
+        if (method_exists($this->ms_graph_auth, 'has_valid_token')) {
+            return $this->ms_graph_auth->has_valid_token();
+        }
+        
+        // Fallback to checking if refresh token exists
+        return !empty(get_option('massage_booking_ms_refresh_token'));
     }
     
     /**
@@ -131,16 +135,6 @@ class Massage_Booking_Calendar {
                 ]);
             }
             return new WP_Error('calendar_not_configured', 'Calendar integration is not configured');
-        }
-        
-        // Get access token
-        if (!$this->get_access_token()) {
-            if ($this->debug) {
-                $this->log_action('create_event_error', [
-                    'error' => 'Failed to authenticate with Microsoft Graph'
-                ]);
-            }
-            return new WP_Error('auth_error', 'Failed to authenticate with Microsoft Graph');
         }
         
         try {
@@ -212,10 +206,22 @@ class Massage_Booking_Calendar {
                 'showAs' => 'busy'
             ];
             
+            // Get access token using delegated authentication
+            $access_token = $this->ms_graph_auth->get_access_token();
+            
+            if (!$access_token) {
+                if ($this->debug) {
+                    $this->log_action('create_event_auth_error', [
+                        'error' => 'Failed to get access token'
+                    ]);
+                }
+                return new WP_Error('auth_error', 'Failed to get access token');
+            }
+            
             if ($this->debug) {
                 $this->log_action('create_event_request', [
                     'event' => $event,
-                    'token' => substr($this->access_token, 0, 10) . '...',
+                    'token' => substr($access_token, 0, 10) . '...',
                     'endpoint' => $this->graph_endpoint . 'me/events'
                 ]);
             }
@@ -225,7 +231,7 @@ class Massage_Booking_Calendar {
                 $this->graph_endpoint . 'me/events',
                 [
                     'headers' => [
-                        'Authorization' => 'Bearer ' . $this->access_token,
+                        'Authorization' => 'Bearer ' . $access_token,
                         'Content-Type' => 'application/json'
                     ],
                     'body' => wp_json_encode($event),
@@ -256,6 +262,14 @@ class Massage_Booking_Calendar {
             
             if ($status_code >= 400) {
                 $error_message = isset($body['error']['message']) ? $body['error']['message'] : 'Unknown API error';
+                
+                // When getting auth errors, try to refresh token
+                if ($status_code === 401 || (isset($body['error']['code']) && $body['error']['code'] === 'InvalidAuthenticationToken')) {
+                    if ($this->ms_graph_auth->refresh_access_token()) {
+                        // Try the request again with the new token
+                        return $this->create_event($appointment);
+                    }
+                }
                 
                 if ($this->debug) {
                     $this->log_action('create_event_api_error', [
@@ -305,15 +319,22 @@ class Massage_Booking_Calendar {
             return new WP_Error('calendar_not_configured', 'Calendar integration is not configured');
         }
         
-        // Get access token
-        if (!$this->get_access_token()) {
-            return new WP_Error('auth_error', 'Failed to authenticate with Microsoft Graph');
-        }
-        
         try {
             // Validate event ID
             if (empty($event_id)) {
                 return new WP_Error('invalid_event_id', 'Event ID is required');
+            }
+            
+            // Get access token using delegated authentication
+            $access_token = $this->ms_graph_auth->get_access_token();
+            
+            if (!$access_token) {
+                if ($this->debug) {
+                    $this->log_action('delete_event_auth_error', [
+                        'error' => 'Failed to get access token'
+                    ]);
+                }
+                return new WP_Error('auth_error', 'Failed to get access token');
             }
             
             // Call Microsoft Graph API to delete event
@@ -322,7 +343,7 @@ class Massage_Booking_Calendar {
                 [
                     'method' => 'DELETE',
                     'headers' => [
-                        'Authorization' => 'Bearer ' . $this->access_token
+                        'Authorization' => 'Bearer ' . $access_token
                     ],
                     'timeout' => 15
                 ]
@@ -343,6 +364,14 @@ class Massage_Booking_Calendar {
             if ($status_code >= 400) {
                 $body = json_decode(wp_remote_retrieve_body($response), true);
                 $error_message = isset($body['error']['message']) ? $body['error']['message'] : 'Unknown error';
+                
+                // When getting auth errors, try to refresh token
+                if ($status_code === 401 || (isset($body['error']['code']) && $body['error']['code'] === 'InvalidAuthenticationToken')) {
+                    if ($this->ms_graph_auth->refresh_access_token()) {
+                        // Try the request again with the new token
+                        return $this->delete_event($event_id);
+                    }
+                }
                 
                 if ($this->debug) {
                     $this->log_action('delete_event_api_error', [
@@ -378,3 +407,27 @@ class Massage_Booking_Calendar {
             return new WP_Error('calendar_exception', $e->getMessage());
         }
     }
+    
+    /**
+     * Log action for debugging
+     * Simple logging method for calendar actions
+     * 
+     * @param string $action Action being performed
+     * @param array $data Additional data to log
+     */
+    private function log_action($action, $data = []) {
+        if (!$this->debug) {
+            return;
+        }
+        
+        // If massage_booking_calendar_debug function exists, use it
+        if (function_exists('massage_booking_calendar_debug')) {
+            massage_booking_calendar_debug($action, $data);
+            return;
+        }
+        
+        // Otherwise, use error_log as fallback
+        error_log('Calendar Action: ' . $action . ' - Data: ' . wp_json_encode($data));
+    }
+}
+?>
