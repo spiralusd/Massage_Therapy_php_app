@@ -2,8 +2,8 @@
 /**
  * Template Name: Massage Booking Form
  *
- * A custom page template that displays the massage booking form without header and footer.
- * Merged version with embedded form content.
+ * A custom page template that displays the massage booking form.
+ * This is a simplified version that resolves script conflicts.
  */
 
 // Exit if accessed directly or from admin
@@ -18,6 +18,7 @@ if (!defined('WPINC') || is_admin()) {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <?php wp_head(); ?>
     <style>
+        /* Critical CSS for the booking form */
         :root {
             --primary-color: #4a6fa5;
             --secondary-color: #98c1d9;
@@ -55,7 +56,7 @@ if (!defined('WPINC') || is_admin()) {
             color: #7f8c8d;
         }
         
-        /* Optimized Form Styles */
+        /* Form Styles */
         .form-group {
             margin-bottom: 25px;
         }
@@ -196,10 +197,47 @@ if (!defined('WPINC') || is_admin()) {
             display: block;
         }
         
+        /* Form error message */
+        .form-error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+        }
+        
+        /* Loading overlay */
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        
         @media (max-width: 768px) {
             .time-slots {
                 grid-template-columns: repeat(2, 1fr);
             }
+            
+            .radio-group, .checkbox-group {
+                flex-direction: column;
+            }
+            
+            .radio-option, .checkbox-option {
+                flex: 1 1 100%;
+            }
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -326,7 +364,10 @@ if (!defined('WPINC') || is_admin()) {
     </div>
     
     <?php
-    // Enqueue necessary scripts and styles
+    // We need to manually enqueue our scripts in the correct order
+    wp_enqueue_script('jquery');
+    
+    // Enqueue form styles
     wp_enqueue_style(
         'massage-booking-form-style',
         MASSAGE_BOOKING_PLUGIN_URL . 'public/css/booking-form.css',
@@ -334,19 +375,19 @@ if (!defined('WPINC') || is_admin()) {
         MASSAGE_BOOKING_VERSION
     );
     
-    // Enqueue optimized form script
+    // Enqueue base form script
     wp_enqueue_script(
         'massage-booking-form-script',
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/booking-form.min.js',
+        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/booking-form-optimized.js',
         array('jquery'),
         MASSAGE_BOOKING_VERSION,
         true
     );
     
-    // Enqueue optimized API connector
+    // Enqueue API connector
     wp_enqueue_script(
         'massage-booking-api-connector',
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-connector.min.js',
+        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-connector-optimized.js',
         array('jquery', 'massage-booking-form-script'),
         MASSAGE_BOOKING_VERSION,
         true
@@ -354,11 +395,101 @@ if (!defined('WPINC') || is_admin()) {
     
     // Pass WordPress data to JavaScript
     wp_localize_script('massage-booking-api-connector', 'massageBookingAPI', array(
+        'ajaxUrl' => admin_url('admin-ajax.php'),
         'restUrl' => esc_url_raw(rest_url('massage-booking/v1/')),
         'nonce' => wp_create_nonce('wp_rest'),
-        'ajaxUrl' => admin_url('admin-ajax.php')
+        'siteUrl' => get_site_url(),
+        'isLoggedIn' => is_user_logged_in() ? 'yes' : 'no',
+        'version' => MASSAGE_BOOKING_VERSION
     ));
+    
+    // Enqueue form submission handler (must be last)
+    wp_enqueue_script(
+        'massage-booking-form-submit-fix',
+        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/form-submit-fix.js',
+        array('jquery', 'massage-booking-form-script', 'massage-booking-api-connector'),
+        MASSAGE_BOOKING_VERSION,
+        true
+    );
     ?>
+    <script type="text/javascript">
+    jQuery(document).ready(function($) {
+        // Initialize radio buttons
+        $('.radio-option').each(function() {
+            // If the radio button is checked initially, add selected class
+            if ($(this).find('input[type="radio"]').is(':checked')) {
+                $(this).addClass('selected');
+            }
+            
+            $(this).on('click', function() {
+                // Find all radio options and remove selected class
+                $('.radio-option').removeClass('selected');
+                
+                // Add selected class to clicked option
+                $(this).addClass('selected');
+                
+                // Check the radio input
+                $(this).find('input[type="radio"]').prop('checked', true);
+                
+                // Update booking summary if it exists
+                if (typeof window.updateSummary === 'function') {
+                    window.updateSummary();
+                }
+                
+                // If date is selected, update time slots
+                var selectedDate = $('#appointmentDate').val();
+                if (selectedDate) {
+                    var duration = $(this).find('input[type="radio"]').val();
+                    if (typeof window.fetchAvailableTimeSlots === 'function') {
+                        window.fetchAvailableTimeSlots(selectedDate, duration);
+                    }
+                }
+            });
+        });
+        
+        // Initialize checkbox options
+        $('.checkbox-option').each(function() {
+            // If the checkbox is checked initially, add selected class
+            if ($(this).find('input[type="checkbox"]').is(':checked')) {
+                $(this).addClass('selected');
+            }
+            
+            $(this).on('click', function() {
+                // Toggle selected class
+                $(this).toggleClass('selected');
+                
+                // Toggle checkbox
+                var checkbox = $(this).find('input[type="checkbox"]');
+                checkbox.prop('checked', !checkbox.prop('checked'));
+                
+                // Update booking summary if it exists
+                if (typeof window.updateSummary === 'function') {
+                    window.updateSummary();
+                }
+            });
+        });
+        
+        // Initialize date picker to trigger time slot updates
+        $('#appointmentDate').on('change', function() {
+            var selectedDate = $(this).val();
+            if (selectedDate) {
+                var duration = $('input[name="duration"]:checked').val();
+                if (typeof window.fetchAvailableTimeSlots === 'function') {
+                    window.fetchAvailableTimeSlots(selectedDate, duration);
+                }
+            }
+        });
+        
+        // Set minimum date to today
+        const today = new Date();
+        $('#appointmentDate').attr('min', today.toISOString().split('T')[0]);
+        
+        // Load settings when page loads (if available)
+        if (typeof window.loadSettings === 'function') {
+            window.loadSettings();
+        }
+    });
+    </script>
     
     <?php wp_footer(); ?>
 </body>

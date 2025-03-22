@@ -2,15 +2,10 @@
 /**
  * Plugin Name: Massage Booking System
  * Description: HIPAA-compliant booking system for massage therapy
- * Version: 1.0.5.1
+ * Version: 1.0.6
  * Author: Darrin Jackson/Spiral Powered Records
  * Text Domain: massage-booking
  */
-
-// If this file is called directly, abort.
-if (!defined('WPINC')) {
-    die;
-}
 
 // Version history:
 // 1.0.0 - Initial release
@@ -19,6 +14,7 @@ if (!defined('WPINC')) {
 // 1.0.3 - Added thank you page, email verification, and diagnostics features
 // 1.0.4 - Minor Changes, fixed Json
 // 1.0.5 - Bug fixes, improved appointments page
+// 1.0.6 - Admin debug panel
 
 /**
  * Changelog for version 1.0.3:
@@ -46,8 +42,25 @@ if (!defined('WPINC')) {
  *  -Small update to fix calender intergration
 */
 
+/**
+ * Version: 1.0.6
+ * Changelog:
+ * - Fixed Microsoft Graph calendar integration authentication issue
+ * - Added enhanced debug system with admin interface
+ * - Added ability to enable/disable debugging from settings
+ * - Added context-based filtering for debug logs
+ * - Added tool to reset Microsoft Graph authentication
+ * - Improved error handling in calendar operations
+ * - Enhanced MS Graph authentication with better token management
+ */
+
+// If this file is called directly, abort.
+if (!defined('WPINC')) {
+    die;
+}
+
 // Define plugin constants
-define('MASSAGE_BOOKING_VERSION', '1.0.5.1'); // Match the plugin header version
+define('MASSAGE_BOOKING_VERSION', '1.0.6'); // Match the plugin header version
 define('MASSAGE_BOOKING_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('MASSAGE_BOOKING_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -59,47 +72,53 @@ function massage_booking_is_admin_area() {
     return is_admin() && (!defined('DOING_AJAX') || !DOING_AJAX);
 }
 
-// Include core files needed everywhere
+// Critical files needed first - Database, settings, and encryption
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-database-optimized.php';
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-settings.php';
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-encryption-optimized.php';
-require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-audit-log-optimized.php';
-require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/database-extension.php';
+
+// Debug utilities should load early
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'debug.php';
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/enhanced-debug.php';
 
+// Audit log system
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-audit-log-optimized.php';
 
-
-
-// Include optimized functions file
+// Load optimized functions and integration
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'functions-optimized.php';
 require_once MASSAGE_BOOKING_PLUGIN_DIR . 'integration.php';
 
-// Include context-specific files
-if (massage_booking_is_admin_area()) {
-    // Admin-only includes
+// Database extension (should load after database class)
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/database-extension.php';
+
+// MS Auth Reset tool (admin only)
+if (is_admin()) {
+    require_once MASSAGE_BOOKING_PLUGIN_DIR . 'admin/reset-ms-auth.php';
     require_once MASSAGE_BOOKING_PLUGIN_DIR . 'admin-fix.php';
     require_once MASSAGE_BOOKING_PLUGIN_DIR . 'admin/admin-page.php';
     require_once MASSAGE_BOOKING_PLUGIN_DIR . 'admin/settings-page.php';
-} else {
-    // Front-end only includes
+    require_once MASSAGE_BOOKING_PLUGIN_DIR . 'admin/admin-appointments-fix.php';
+}
+
+// Microsoft Graph Authentication Handler (needed for calendar)
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-ms-graph-auth.php';
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-calendar-optimized.php';
+
+// Always include the appointments class with REST API endpoints
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-appointments.php';
+
+// Email and notification systems
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/emails-optimized.php';
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/thank-you-page-integration.php';
+
+// Frontend-specific files
+if (!massage_booking_is_admin_area()) {
     require_once MASSAGE_BOOKING_PLUGIN_DIR . 'public/booking-form.php';
     require_once MASSAGE_BOOKING_PLUGIN_DIR . 'public/shortcodes.php';
 }
 
-// Include Microsoft Graph Authentication Handler
-require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-ms-graph-auth.php';
-
-// Always include the appointments class with REST API endpoints
-require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-appointments.php';
-require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-calendar-optimized.php';
-
-// Include the new email verification integration
-require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/thank-you-page-integration.php';
-
-
-// Include the emails class
-require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/emails-optimized.php';
+// Enhanced debug
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-debug.php';
 
 // Activation hook
 register_activation_hook(__FILE__, 'massage_booking_activate');
@@ -175,123 +194,6 @@ function massage_booking_uninstall() {
     }
 }
 
-/**
- * Improved template loading function
- */
-function massage_booking_load_template($template) {
-    // NEVER apply in admin area under any circumstances
-    if (is_admin()) {
-        return $template;
-    }
-    
-    global $post;
-    
-    // Ensure post is valid
-    if (!is_object($post)) {
-        return $template;
-    }
-    
-    // Check for our template
-    $our_template = MASSAGE_BOOKING_PLUGIN_DIR . 'public/templates/page-booking.php';
-    $template_meta = get_post_meta($post->ID, '_wp_page_template', true);
-    
-    if (is_page() && $template_meta === $our_template) {
-        // Log that we're loading our template (for debugging)
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Massage Booking: Loading template ' . $our_template);
-        }
-        
-        return $our_template;
-    }
-    
-    return $template;
-}
-
-// Add template filter (don't try to remove it first as it wasn't added yet)
-add_filter('template_include', 'massage_booking_load_template');
-
-function massage_booking_load_template_safe($template) {
-    // NEVER apply in admin area
-    if (is_admin()) {
-        return $template;
-    }
-    
-    global $post;
-    
-    // Ensure post is valid
-    if (!is_object($post)) {
-        return $template;
-    }
-    
-    // Check for our template
-    $our_template = MASSAGE_BOOKING_PLUGIN_DIR . 'public/templates/page-booking.php';
-    $template_meta = get_post_meta($post->ID, '_wp_page_template', true);
-    
-    if (is_page() && $template_meta === $our_template) {
-        return $our_template;
-    }
-    
-    return $template;
-}
-
-// Add this after massage_booking_load_template function is defined
-add_filter('template_include', 'massage_booking_load_template_safe', 20);
-
-/**
- * Register and enqueue assets (original version - now handled by optimized version)
- * Kept for reference but not hooked
- */
-function massage_booking_register_assets() {
-    // Only enqueue on the booking form page
-    if (is_page_template('page-booking.php') || 
-        (is_page() && get_post_meta(get_the_ID(), '_wp_page_template', true) === MASSAGE_BOOKING_PLUGIN_DIR . 'public/templates/page-booking.php')) {
-        
-        // Register CSS
-        wp_register_style(
-            'massage-booking-form-style',
-            MASSAGE_BOOKING_PLUGIN_URL . 'public/css/booking-form.css',
-            array(),
-            MASSAGE_BOOKING_VERSION
-        );
-        
-        // Register JS
-        wp_register_script(
-            'massage-booking-form-script',
-            MASSAGE_BOOKING_PLUGIN_URL . 'public/js/booking-form-optimized.js',
-            array('jquery'),
-            MASSAGE_BOOKING_VERSION,
-            true
-        );
-        
-        // Register API connector
-        wp_register_script(
-            'massage-booking-api-connector',
-            MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-connector-optimized.js',
-            array('jquery', 'massage-booking-form-script'),
-            MASSAGE_BOOKING_VERSION,
-            true
-        );
-        
-        // Enqueue everything
-        wp_enqueue_style('massage-booking-form-style');
-        wp_enqueue_script('massage-booking-form-script');
-        wp_enqueue_script('massage-booking-api-connector');
-        
-        // Pass WordPress data to JS
-        wp_localize_script('massage-booking-api-connector', 'massageBookingAPI', array(
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'restUrl' => esc_url_raw(rest_url('massage-booking/v1/')),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'siteUrl' => get_site_url(),
-            'isLoggedIn' => is_user_logged_in(),
-            'sessionTimeout' => apply_filters('massage_booking_session_timeout', 20 * 60), // 20 minutes in seconds
-            'version' => MASSAGE_BOOKING_VERSION
-        ));
-    }
-}
-// Don't add the original action - the optimized version will be used instead
-// The remove_action call is in functions-optimized.php
-
 // Add backup functionality
 function massage_booking_register_backup() {
     require_once plugin_dir_path(__FILE__) . 'includes/class-backup.php';
@@ -339,9 +241,6 @@ add_action('rest_api_init', 'massage_booking_register_rest_api');
 function massage_booking_init() {
     // Load text domain for translations
     load_plugin_textdomain('massage-booking', false, dirname(plugin_basename(__FILE__)) . '/languages');
-    
-    // Register post types or taxonomies if needed
-    // (none for this plugin)
 }
 add_action('init', 'massage_booking_init');
 
@@ -396,10 +295,9 @@ function massage_booking_force_admin_template_reset() {
         }
     }
 }
-// Add the missing hook for the admin template reset function
 add_action('admin_init', 'massage_booking_force_admin_template_reset');
 
-//Version Check functionality
+// Version Check functionality
 function massage_booking_check_version() {
     $current_version = get_option('massage_booking_version');
     
@@ -418,3 +316,30 @@ function massage_booking_check_version() {
     }
 }
 add_action('plugins_loaded', 'massage_booking_check_version');
+
+/**
+ * Clear any conflicting AJAX handlers when plugin loads
+ * This ensures we don't have duplicate handlers causing issues
+ */
+function massage_booking_clear_conflicting_handlers() {
+    // Check if functions from various files exist and remove potential conflicts
+    if (function_exists('massage_booking_handle_appointment')) {
+        remove_action('wp_ajax_massage_booking_create_appointment', 'massage_booking_handle_appointment');
+        remove_action('wp_ajax_nopriv_massage_booking_create_appointment', 'massage_booking_handle_appointment');
+    }
+    
+    if (function_exists('massage_booking_simple_appointment_handler')) {
+        remove_action('wp_ajax_massage_booking_create_appointment', 'massage_booking_simple_appointment_handler');
+        remove_action('wp_ajax_nopriv_massage_booking_create_appointment', 'massage_booking_simple_appointment_handler');
+    }
+    
+    if (function_exists('massage_booking_improved_appointment_handler')) {
+        remove_action('wp_ajax_massage_booking_create_appointment', 'massage_booking_improved_appointment_handler');
+        remove_action('wp_ajax_nopriv_massage_booking_create_appointment', 'massage_booking_improved_appointment_handler');
+    }
+}
+add_action('init', 'massage_booking_clear_conflicting_handlers', 1); // Priority 1 to run before others
+
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'admin-menu-fix.php';
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'appointments-page-fix.php';
+require_once MASSAGE_BOOKING_PLUGIN_DIR . 'plugin-integration-fix.php';

@@ -86,3 +86,17 @@ if (!function_exists('massage_booking_check_slot_availability_optimized')) {
         ]);
     }
 }
+/**
+ * Fix for script loading conflicts
+ */
+function massage_booking_fix_script_conflicts() {
+    // Remove specific lingering handlers to prevent conflicts
+    remove_action('wp_ajax_massage_booking_create_appointment', 'massage_booking_handle_appointment');
+    remove_action('wp_ajax_nopriv_massage_booking_create_appointment', 'massage_booking_handle_appointment');
+    remove_action('wp_ajax_massage_booking_create_appointment', 'massage_booking_simple_appointment_handler');
+    remove_action('wp_ajax_nopriv_massage_booking_create_appointment', 'massage_booking_simple_appointment_handler');
+    remove_action('wp_ajax_massage_booking_create_appointment', 'massage_booking_improved_appointment_handler');
+    remove_action('wp_ajax_nopriv_massage_booking_create_appointment', 'massage_booking_improved_appointment_handler');
+}
+add_action('init', 'massage_booking_fix_script_conflicts', 5);
+?>
