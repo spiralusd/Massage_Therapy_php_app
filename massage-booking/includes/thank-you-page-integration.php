@@ -1,6 +1,7 @@
 <?php
 /**
- * Thank You Page and Email Verification Integration
+ * This is a replacement for the thank-you-page-integration.php file
+ * It prevents function redeclaration by adding a function_exists check
  */
 
 // Exit if accessed directly
@@ -74,83 +75,86 @@ add_action('admin_menu', 'massage_booking_add_email_verification_menu');
 
 /**
  * Email verification admin page
+ * This function now checks if it already exists before declaring it
  */
-function massage_booking_email_verification_page() {
-    // Check user capabilities
-    if (!current_user_can('manage_options')) {
-        return;
-    }
-    
-    // Instantiate emails class
-    $emails = new Massage_Booking_Emails();
-    
-    // Perform email configuration test if requested
-    $test_results = null;
-    if (isset($_POST['test_email_config']) && check_admin_referer('massage_booking_email_test')) {
-        $test_results = $emails->validate_email_configuration();
-    }
-    
-    // Get email diagnostics
-    $diagnostics = $emails->diagnose_email_issues();
-    
-    ?>
-    <div class="wrap massage-booking-admin">
-        <h1>Email Verification</h1>
+if (!function_exists('massage_booking_email_verification_page')) {
+    function massage_booking_email_verification_page() {
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
+            return;
+        }
         
-        <div class="email-diagnostics">
-            <h2>Email Configuration Diagnostics</h2>
-            
-            <table class="widefat">
-                <thead>
-                    <tr>
-                        <th>Configuration</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>PHP Mail Function</td>
-                        <td><?php echo $diagnostics['php_mail_enabled'] ? 'Enabled ✓' : 'Disabled ✗'; ?></td>
-                    </tr>
-                    <tr>
-                        <td>WordPress Mail Function</td>
-                        <td><?php echo $diagnostics['wp_mail_function'] ? 'Available ✓' : 'Not Available ✗'; ?></td>
-                    </tr>
-                    <tr>
-                        <td>Admin Email</td>
-                        <td><?php echo esc_html($diagnostics['wordpress_email_config']['admin_email']); ?></td>
-                    </tr>
-                </tbody>
-            </table>
-            
-            <?php if ($test_results): ?>
-                <div class="email-test-results">
-                    <h3>Email Test Results</h3>
-                    <p>
-                        <strong>Result:</strong> 
-                        <?php if ($test_results['success']): ?>
-                            <span style="color: green;">Test Email Sent Successfully ✓</span>
-                        <?php else: ?>
-                            <span style="color: red;">Test Email Failed ✗</span>
-                        <?php endif; ?>
-                    </p>
-                    <p><strong>Sent To:</strong> <?php echo esc_html($test_results['business_email']); ?></p>
-                    <p><strong>Timestamp:</strong> <?php echo esc_html($test_results['timestamp']); ?></p>
-                </div>
-            <?php endif; ?>
-            
-            <form method="post" action="">
-                <?php wp_nonce_field('massage_booking_email_test'); ?>
-                <input type="submit" name="test_email_config" class="button button-primary" value="Test Email Configuration">
-            </form>
-        </div>
+        // Instantiate emails class
+        $emails = new Massage_Booking_Emails();
         
-        <div class="advanced-diagnostics">
-            <h2>Advanced Diagnostics</h2>
-            <pre><?php print_r($diagnostics); ?></pre>
+        // Perform email configuration test if requested
+        $test_results = null;
+        if (isset($_POST['test_email_config']) && check_admin_referer('massage_booking_email_test')) {
+            $test_results = $emails->validate_email_configuration();
+        }
+        
+        // Get email diagnostics
+        $diagnostics = $emails->diagnose_email_issues();
+        
+        ?>
+        <div class="wrap massage-booking-admin">
+            <h1>Email Verification</h1>
+            
+            <div class="email-diagnostics">
+                <h2>Email Configuration Diagnostics</h2>
+                
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Configuration</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>PHP Mail Function</td>
+                            <td><?php echo $diagnostics['php_mail_enabled'] ? 'Enabled ✓' : 'Disabled ✗'; ?></td>
+                        </tr>
+                        <tr>
+                            <td>WordPress Mail Function</td>
+                            <td><?php echo $diagnostics['wp_mail_function'] ? 'Available ✓' : 'Not Available ✗'; ?></td>
+                        </tr>
+                        <tr>
+                            <td>Admin Email</td>
+                            <td><?php echo esc_html($diagnostics['wordpress_email_config']['admin_email']); ?></td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <?php if ($test_results): ?>
+                    <div class="email-test-results">
+                        <h3>Email Test Results</h3>
+                        <p>
+                            <strong>Result:</strong> 
+                            <?php if ($test_results['success']): ?>
+                                <span style="color: green;">Test Email Sent Successfully ✓</span>
+                            <?php else: ?>
+                                <span style="color: red;">Test Email Failed ✗</span>
+                            <?php endif; ?>
+                        </p>
+                        <p><strong>Sent To:</strong> <?php echo esc_html($test_results['business_email']); ?></p>
+                        <p><strong>Timestamp:</strong> <?php echo esc_html($test_results['timestamp']); ?></p>
+                    </div>
+                <?php endif; ?>
+                
+                <form method="post" action="">
+                    <?php wp_nonce_field('massage_booking_email_test'); ?>
+                    <input type="submit" name="test_email_config" class="button button-primary" value="Test Email Configuration">
+                </form>
+            </div>
+            
+            <div class="advanced-diagnostics">
+                <h2>Advanced Diagnostics</h2>
+                <pre><?php print_r($diagnostics); ?></pre>
+            </div>
         </div>
-    </div>
-    <?php
+        <?php
+    }
 }
 
 /**
