@@ -766,20 +766,6 @@ function massage_booking_admin_scripts() {
 }
 add_action('admin_enqueue_scripts', 'massage_booking_admin_scripts');
 
-/**
- * Add CSS-based fix to prevent booking form display in admin
- */
-function massage_booking_admin_css_fix() {
-    echo '<style>
-        body.wp-admin #appointmentForm,
-        body.wp-admin form#appointmentForm,
-        body.wp-admin .booking-form-container,
-        body.wp-admin .massage-booking-container {
-            display: none !important;
-        }
-    </style>';
-}
-add_action('admin_head', 'massage_booking_admin_css_fix');
 
 /**
  * Function to get pending appointments count via AJAX (for admin dashboard widget)
