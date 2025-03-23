@@ -256,7 +256,8 @@ class Massage_Booking_MS_Graph_Auth {
                 'refresh_token' => $refresh_token,
                 'scope' => 'offline_access Calendars.ReadWrite'
             ],
-            'timeout' => 30
+            'timeout' => 30,
+            'sslverify' => true
         ]);
 
         if (is_wp_error($response)) {

@@ -667,27 +667,37 @@
                         }
                     },
                     error: function(xhr, status, error) {
-                        console.log('AJAX error', {
+                        console.error('AJAX error', {
                             status: status,
                             error: error,
                             response: xhr.responseText
                         });
-                        
+
                         let errorMessage = 'Server connection error. Please try again.';
                         let errorData = {};
-                        
-                        // Try to extract more info from response
+
+                        // Try to extract more detailed error information
                         try {
                             const jsonResponse = JSON.parse(xhr.responseText);
                             if (jsonResponse.data && jsonResponse.data.message) {
                                 errorMessage = jsonResponse.data.message;
+                            } else if (jsonResponse.message) {
+                                errorMessage = jsonResponse.message;
                             }
                             errorData = jsonResponse;
                         } catch (e) {
-                            // Not JSON, use text response
-                            errorMessage = xhr.responseText || error || 'Unknown error';
+                            // Not JSON, use text response or status
+                            if (xhr.status === 0) {
+                                errorMessage = 'Network error. Please check your connection.';
+                            } else if (xhr.status === 403) {
+                                errorMessage = 'Permission denied. Please refresh the page and try again.';
+                            } else if (xhr.status >= 500) {
+                                errorMessage = 'Server error. Please try again later.';
+                            } else {
+                                errorMessage = xhr.responseText || error || 'Unknown error';
+                            }
                         }
-                        
+
                         reject({
                             message: errorMessage,
                             code: status,

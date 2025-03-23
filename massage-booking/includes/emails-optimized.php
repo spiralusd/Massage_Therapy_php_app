@@ -73,23 +73,23 @@ class Massage_Booking_Emails {
         return "
             <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
                 <h2>Appointment Confirmation</h2>
-                <p>Dear {$appointment_data['full_name']},</p>
+                <p>Dear " . esc_html($appointment_data['full_name']) . ",</p>
                 <p>Your massage therapy appointment has been confirmed:</p>
-                
+
                 <div style='background-color: #f7f7f7; padding: 15px; border-radius: 5px; margin: 20px 0;'>
-                    <p><strong>Date:</strong> {$formatted_date}</p>
-                    <p><strong>Time:</strong> {$formatted_time}</p>
-                    <p><strong>Duration:</strong> {$appointment_data['duration']} minutes</p>
-                    <p><strong>Focus Areas:</strong> {$focus_areas}</p>
-                    <p><strong>Pressure Preference:</strong> {$appointment_data['pressure_preference']}</p>
+                    <p><strong>Date:</strong> " . esc_html($formatted_date) . "</p>
+                    <p><strong>Time:</strong> " . esc_html($formatted_time) . "</p>
+                    <p><strong>Duration:</strong> " . esc_html($appointment_data['duration']) . " minutes</p>
+                    <p><strong>Focus Areas:</strong> " . esc_html($focus_areas) . "</p>
+                    <p><strong>Pressure Preference:</strong> " . esc_html($pressure_preference) . "</p>
                 </div>
-                
+
                 <p>If you need to reschedule or cancel, please contact us at least 24 hours in advance.</p>
                 <p>Thank you for booking with us!</p>
-                
+
                 <p style='margin-top: 30px;'>
                     Regards,<br>
-                    {$business_name}
+                    " . esc_html($business_name) . "
                 </p>
             </div>
         ";

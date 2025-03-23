@@ -84,6 +84,7 @@ function massage_booking_load_files() {
     // MS Auth handler (needed for calendar integration)
     require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-ms-graph-auth.php';
     
+    
     // Calendar functionality - choose optimized version if available
     if (file_exists(MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-calendar-optimized.php')) {
         require_once MASSAGE_BOOKING_PLUGIN_DIR . 'includes/class-calendar-optimized.php';

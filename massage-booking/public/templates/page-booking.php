@@ -254,23 +254,23 @@ if (!defined('WPINC') || is_admin()) {
             <!-- Personal Information -->
             <div class="form-group">
                 <label for="fullName">Full Name:</label>
-                <input type="text" id="fullName" name="fullName" required>
+                <input type="text" id="fullName" name="fullName" required aria-required="true">
             </div>
             
             <div class="form-group">
                 <label for="email">Email Address:</label>
-                <input type="email" id="email" name="email" required>
+                <input type="email" id="email" name="email" required aria-required="true">
             </div>
             
             <div class="form-group">
                 <label for="phone">Phone Number:</label>
-                <input type="tel" id="phone" name="phone" required>
+                <input type="tel" id="phone" name="phone" required aria-required="true">
             </div>
             
             <!-- Service Selection -->
             <div class="form-group">
                 <label>Select Service Duration:</label>
-                <div class="radio-group" id="serviceDuration">
+                <div class="radio-group" id="serviceDuration" role="radiogroup" aria-label="Service Duration Options">
                     <div class="radio-option" data-value="60" data-price="95">
                         <input type="radio" name="duration" id="duration60" value="60" checked>
                         <label for="duration60">60 Minutes <span class="price">$95</span></label>
@@ -289,7 +289,7 @@ if (!defined('WPINC') || is_admin()) {
             <!-- Additional Services -->
             <div class="form-group">
                 <label>Focus Areas (Select all that apply):</label>
-                <div class="checkbox-group" id="focusAreas">
+                <div class="checkbox-group" id="focusAreas" role="group" aria-label="Focus Areas Options">
                     <div class="checkbox-option" data-value="back">
                         <input type="checkbox" name="focus" id="focusBack" value="Back & Shoulders">
                         <label for="focusBack">Back & Shoulders</label>

@@ -145,7 +145,10 @@ class Massage_Booking_Database {
         }
         
         // Sanitize orderby and order
-        $orderby = sanitize_sql_orderby($args['orderby'] . ' ' . $args['order']) ?: 'appointment_date ASC';
+        $valid_columns = ['id', 'appointment_date', 'start_time', 'status', 'created_at']; 
+        $orderby_col = in_array($args['orderby'], $valid_columns) ? $args['orderby'] : 'appointment_date';
+        $order = strtoupper($args['order']) === 'DESC' ? 'DESC' : 'ASC';
+        $orderby = "$orderby_col $order";
         
         // Add LIMIT and OFFSET
         $limit = intval($args['limit']);
@@ -765,11 +768,12 @@ class Massage_Booking_Database {
      * @param string $status Status filter (default: 'confirmed')
      * @return array Array of appointment objects
      */
+    // Get upcoming appointments with one query
     public function get_upcoming_appointments($limit = 5, $status = 'confirmed') {
         global $wpdb;
         $table = $wpdb->prefix . 'massage_appointments';
         $today = date('Y-m-d');
-        
+
         $query = $wpdb->prepare(
             "SELECT * FROM $table WHERE appointment_date >= %s AND status = %s 
             ORDER BY appointment_date ASC, start_time ASC LIMIT %d",
@@ -777,51 +781,50 @@ class Massage_Booking_Database {
             sanitize_text_field($status),
             intval($limit)
         );
-        
+
         $appointments = $wpdb->get_results($query);
-        
+
         // Decrypt sensitive data if needed
-        if (!empty($appointments)) {
-            // Initialize encryption if available
-            if (class_exists('Massage_Booking_Encryption')) {
-                $encryption = new Massage_Booking_Encryption();
-                
-                foreach ($appointments as $key => $appointment) {
-                    // Convert to object if not already
-                    $appointment = (object)$appointment;
-                    
-                    // Add decoded client name for display
-                    try {
-                        $appointment->client_name = $encryption->decrypt($appointment->full_name);
-                        $appointment->client_email = $encryption->decrypt($appointment->email);
-                        $appointment->client_phone = $encryption->decrypt($appointment->phone);
-                    } catch (Exception $e) {
-                        // If decryption fails, use the encrypted values
-                        $appointment->client_name = $appointment->full_name;
-                        $appointment->client_email = $appointment->email;
-                        $appointment->client_phone = $appointment->phone;
+        if (!empty($appointments) && class_exists('Massage_Booking_Encryption')) {
+            $encryption = new Massage_Booking_Encryption();
+
+            foreach ($appointments as $key => $appointment) {
+                // Convert to object if not already
+                $appointment = (object)$appointment;
+
+                // Decrypt data in a single pass
+                try {
+                    $sensitive_fields = ['full_name', 'email', 'phone'];
+                    foreach ($sensitive_fields as $field) {
+                        if (isset($appointment->$field) && !empty($appointment->$field)) {
+                            $decrypted = $encryption->decrypt($appointment->$field);
+                            $client_field = 'client_' . ($field === 'full_name' ? 'name' : $field);
+                            $appointment->$client_field = ($decrypted !== false) ? $decrypted : $appointment->$field;
+                        }
                     }
-                    
-                    $appointments[$key] = $appointment;
-                }
-            } else {
-                // If encryption class is not available, just copy the fields
-                foreach ($appointments as $key => $appointment) {
-                    // Convert to object if not already
-                    $appointment = (object)$appointment;
-                    
+                } catch (Exception $e) {
+                    // If decryption fails, use the encrypted values
                     $appointment->client_name = $appointment->full_name;
                     $appointment->client_email = $appointment->email;
                     $appointment->client_phone = $appointment->phone;
-                    
-                    $appointments[$key] = $appointment;
                 }
+
+                $appointments[$key] = $appointment;
+            }
+        } else if (!empty($appointments)) {
+            // No encryption, just copy fields
+            foreach ($appointments as $key => $appointment) {
+                $appointment = (object)$appointment;
+                $appointment->client_name = $appointment->full_name;
+                $appointment->client_email = $appointment->email;
+                $appointment->client_phone = $appointment->phone;
+                $appointments[$key] = $appointment;
             }
         }
-        
+
         return $appointments;
     }
-    
+
     /**
      * Update appointment status
      *

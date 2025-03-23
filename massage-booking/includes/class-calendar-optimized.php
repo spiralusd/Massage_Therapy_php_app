@@ -12,6 +12,11 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Include MS Graph Auth class if not already included
+if (!class_exists('Massage_Booking_MS_Graph_Auth')) {
+    require_once(plugin_dir_path(__FILE__) . 'class-ms-graph-auth.php');
+}
+
 class Massage_Booking_Calendar {
     /**
      * Microsoft Graph API auth handler
