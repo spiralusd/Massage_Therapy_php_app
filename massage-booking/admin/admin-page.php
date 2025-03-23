@@ -13,31 +13,28 @@ if (!defined('WPINC')) {
 
 // Prevent multiple inclusions and function redefinitions
 if (!function_exists('massage_booking_clean_admin_menu')) {
-    /**
-     * Register clean menu structure
-     */
-    function massage_booking_clean_admin_menu() {
-        // Remove default actions that might be causing duplicates
-        remove_action('admin_menu', 'massage_booking_admin_menu');
-        
+    // Make sure this function runs at the right priority (10 is default)
+    add_action('admin_menu', 'massage_booking_clean_admin_menu', 10);
+
+function massage_booking_clean_admin_menu() {
         // Create main menu
         add_menu_page(
             'Massage Booking',           // Page title
-            'Massage Booking',            // Menu title
-            'manage_options',             // Capability required
-            'massage-booking',            // Menu slug
-            'massage_booking_dashboard_page', // Callback function to display page
-            'dashicons-calendar-alt',     // Icon
-            30                            // Position
+            'Massage Booking',           // Menu title
+            'manage_options',            // Capability required
+            'massage-booking',           // Menu slug
+            'massage_booking_dashboard_page', // Callback function
+            'dashicons-calendar-alt',    // Icon
+            30                           // Position
         );
-        
+
         // Add submenu pages
         add_submenu_page(
-            'massage-booking',            // Parent slug
-            'Dashboard',                  // Page title
-            'Dashboard',                  // Menu title
-            'manage_options',             // Capability
-            'massage-booking',            // Menu slug
+            'massage-booking',           // Parent slug
+            'Dashboard',                 // Page title
+            'Dashboard',                 // Menu title
+            'manage_options',            // Capability
+            'massage-booking',           // Menu slug (same as parent to make it the default page)
             'massage_booking_dashboard_page' // Callback
         );
         
@@ -100,6 +97,13 @@ if (!function_exists('massage_booking_clean_admin_menu')) {
         );
     }
     add_action('admin_menu', 'massage_booking_clean_admin_menu', 999);
+    
+    function massage_booking_dashboard_page() {
+        echo '<div class="wrap">';
+        echo '<h1>Massage Booking Dashboard</h1>';
+        echo '<p>Welcome to the Massage Booking System dashboard.</p>';
+        echo '</div>';
+    }
 
     /**
      * Add pending appointments count to admin menu
