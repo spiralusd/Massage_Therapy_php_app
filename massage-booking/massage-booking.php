@@ -106,10 +106,6 @@ function massage_booking_load_files() {
     
     // Admin-only files
     if (is_admin()) {
-        // Load fixed admin page structure
-        require_once MASSAGE_BOOKING_PLUGIN_DIR . 'admin-menu-fix.php';
-        require_once MASSAGE_BOOKING_PLUGIN_DIR . 'admin-fix.php';
-        require_once MASSAGE_BOOKING_PLUGIN_DIR . 'appointments-page-fix.php';
         
         // Admin pages
         require_once MASSAGE_BOOKING_PLUGIN_DIR . 'admin/admin-page.php';
