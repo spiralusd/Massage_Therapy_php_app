@@ -153,7 +153,7 @@ if (!function_exists('massage_booking_debug_page')) {
 
 /**
  * Fix the duplicate menu items issue by consolidating the admin menu
- */
+ 
 function massage_booking_fixed_admin_menu() {
     // Remove all existing Massage Booking menu items to prevent duplicates
     remove_menu_page('massage-booking');
@@ -230,7 +230,7 @@ function massage_booking_fixed_admin_menu() {
 
 // Run this at a very late priority to override any earlier menu registrations
 add_action('admin_menu', 'massage_booking_fixed_admin_menu', 9999);
-
+*/
 /**
  * Make sure our dashboard page works
  */

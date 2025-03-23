@@ -391,6 +391,7 @@ add_action('plugins_loaded', function() {
 // Add admin menu
 add_action('admin_menu', 'massage_booking_clean_admin_menu', 999);
 
+/*
 // Clean admin menu function
 function massage_booking_clean_admin_menu() {
     // Create main menu
@@ -451,7 +452,7 @@ function massage_booking_clean_admin_menu() {
         'massage-booking-email-verify',
         'massage_booking_email_verification_page'
     );
-}
+} */
 
 // Prevent direct file access to key plugin files
 foreach ([
