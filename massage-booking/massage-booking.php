@@ -82,6 +82,11 @@ function massage_booking_check_requirements() {
     }
 }
 
+// Load the fixes
+if (file_exists(plugin_dir_path(__FILE__) . 'massage-booking-fixes.php')) {
+    require_once plugin_dir_path(__FILE__) . 'massage-booking-fixes.php';
+}
+
 /**
  * Improved file loading with error handling and include guards
  */
