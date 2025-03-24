@@ -92,64 +92,7 @@ if (!function_exists('massage_booking_appointments_page')) {
 /**
  * Implement the missing debug page function
  */
-if (!function_exists('massage_booking_debug_page')) {
-    function massage_booking_debug_page() {
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.', 'massage-booking'));
-        }
-        
-        echo '<div class="wrap massage-booking-admin">';
-        echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
-        
-        echo '<div class="card">';
-        echo '<h2>Debug Information</h2>';
-        
-        echo '<h3>System Info</h3>';
-        echo '<p><strong>PHP Version:</strong> ' . phpversion() . '</p>';
-        echo '<p><strong>WordPress Version:</strong> ' . get_bloginfo('version') . '</p>';
-        echo '<p><strong>Plugin Version:</strong> ' . (defined('MASSAGE_BOOKING_VERSION') ? MASSAGE_BOOKING_VERSION : 'Unknown') . '</p>';
-        
-        echo '<h3>Database Tables</h3>';
-        global $wpdb;
-        $tables = [
-            $wpdb->prefix . 'massage_appointments',
-            $wpdb->prefix . 'massage_audit_log',
-            $wpdb->prefix . 'massage_special_dates'
-        ];
-        
-        echo '<ul>';
-        foreach ($tables as $table) {
-            $exists = $wpdb->get_var("SHOW TABLES LIKE '{$table}'") === $table;
-            echo '<li>' . esc_html($table) . ': ' . ($exists ? '<span style="color:green">Exists</span>' : '<span style="color:red">Missing</span>') . '</li>';
-        }
-        echo '</ul>';
-        
-        echo '<h3>Plugin Files</h3>';
-        if (defined('MASSAGE_BOOKING_PLUGIN_DIR')) {
-            $key_files = [
-                'massage-booking.php',
-                'includes/class-settings.php',
-                'includes/class-database-optimized.php',
-                'includes/class-encryption-optimized.php',
-                'includes/class-audit-log-optimized.php',
-                'admin/admin-page.php'
-            ];
-            
-            echo '<ul>';
-            foreach ($key_files as $file) {
-                $exists = file_exists(MASSAGE_BOOKING_PLUGIN_DIR . $file);
-                echo '<li>' . esc_html($file) . ': ' . ($exists ? '<span style="color:green">Exists</span>' : '<span style="color:red">Missing</span>') . '</li>';
-            }
-            echo '</ul>';
-        } else {
-            echo '<p>MASSAGE_BOOKING_PLUGIN_DIR is not defined</p>';
-        }
-        
-        echo '</div>'; // card
-        echo '</div>'; // wrap
-    }
-}
+
 
 /**
  * Fix the duplicate menu items issue by consolidating the admin menu

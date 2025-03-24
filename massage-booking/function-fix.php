@@ -163,83 +163,70 @@ if (!function_exists('massage_booking_dashboard_page')) {
  * Create a centralized function loader to prevent multiple declarations
  */
 // Add a flag to ensure the function is only loaded once
-    if (!function_exists('massage_booking_load_admin_functions')) {
-        /**
-         * Create a centralized function loader to prevent multiple declarations
-         */
-        function massage_booking_load_admin_functions() {
-            // Unique flag to track if this function has been run
-            static $admin_functions_loaded = false;
-
-            // Exit if already loaded
-            if ($admin_functions_loaded) {
-                return;
-            }
-
-            // Mark as loaded
-            $admin_functions_loaded = true;
-
-            // Make sure these functions are only declared once
-            $admin_functions = [
-                'massage_booking_dashboard_page',
-                'massage_booking_appointments_page',
-                'massage_booking_settings_page',
-                'massage_booking_logs_page',
-                'massage_booking_debug_page',
-                'massage_booking_email_verification_page',
-                'reset_ms_auth_page',
-                'display_appointment_details'
-            ];
-
-            foreach ($admin_functions as $function) {
-                // Check if function already exists to prevent redeclaration
-                if (function_exists($function)) {
-                    // Function already exists, no need to declare it again
+if (!function_exists('massage_booking_load_admin_functions')) {
+    /**
+     * Centralized function loader for admin pages with smart prioritization
+     */
+    function massage_booking_load_admin_functions() {
+        // Static flag to prevent multiple executions
+        static $admin_functions_loaded = false;
+        
+        if ($admin_functions_loaded) {
+            return;
+        }
+        
+        $admin_functions_loaded = true;
+        
+        // List of functions to potentially load
+        $admin_functions = [
+            'massage_booking_dashboard_page',
+            'massage_booking_appointments_page',
+            'massage_booking_settings_page',
+            'massage_booking_logs_page',
+            'massage_booking_debug_page',
+            'massage_booking_email_verification_page',
+            'reset_ms_auth_page',
+            'display_appointment_details'
+        ];
+        
+        // Possible source files with priority order
+        $source_files = [
+            plugin_dir_path(__FILE__) . 'admin/admin-page.php',
+            plugin_dir_path(__FILE__) . 'massage-booking-fixes.php'
+        ];
+        
+        // Functions to prioritize in the latest implementation
+        $priority_functions = [
+            'massage_booking_email_verification_page',
+            'massage_booking_logs_page'
+        ];
+        
+        foreach ($admin_functions as $function) {
+            // Skip if function already exists
+            if (function_exists($function)) {
+                // For priority functions, ensure they use the latest implementation
+                if (in_array($function, $priority_functions)) {
+                    // Remove existing hooks
+                    remove_action('admin_menu', $function, 9);
+                } else {
                     continue;
                 }
-
-                // Load specific files based on which function we need
-                switch ($function) {
-                    case 'massage_booking_appointments_page':
-                    case 'massage_booking_settings_page':
-                    case 'massage_booking_logs_page':
-                        // Prioritize admin-page.php
-                        if (file_exists(plugin_dir_path(__FILE__) . 'admin/admin-page.php')) {
-                            require_once plugin_dir_path(__FILE__) . 'admin/admin-page.php';
-                        } else if (file_exists(plugin_dir_path(__FILE__) . 'massage-booking-fixes.php')) {
-                            require_once plugin_dir_path(__FILE__) . 'massage-booking-fixes.php';
-                        }
+            }
+            
+            // Try loading from source files
+            foreach ($source_files as $file) {
+                if (file_exists($file)) {
+                    require_once $file;
+                    
+                    // If function is now defined, break inner loop
+                    if (function_exists($function)) {
                         break;
-
-                    default:
-                        // For other functions, check both possible files
-                        if (file_exists(plugin_dir_path(__FILE__) . 'admin/admin-page.php') && 
-                            !function_exists($function)) {
-                            require_once plugin_dir_path(__FILE__) . 'admin/admin-page.php';
-                        } else if (file_exists(plugin_dir_path(__FILE__) . 'massage-booking-fixes.php') && 
-                            !function_exists($function)) {
-                            require_once plugin_dir_path(__FILE__) . 'massage-booking-fixes.php';
-                        }
-                        break;
+                    }
                 }
             }
-        }
-    }
-
-    // Modify the hook to use a unique priority
-    add_action('admin_menu', 'massage_booking_load_admin_functions', 9);
-
-function massage_booking_load_admin_functions() {
-    // Prioritize admin-page.php implementation for specific functions
-    $functions_to_prioritize = [
-        'massage_booking_email_verification_page',
-        'massage_booking_logs_page'
-    ];
-
-    // Check if admin-page.php exists
-    if (file_exists(plugin_dir_path(__FILE__) . 'admin/admin-page.php')) {
-        foreach ($functions_to_prioritize as $function) {
-            remove_action('admin_menu', $function, 9);
         }
     }
 }
+
+// Register the function loader with a unique priority
+add_action('admin_menu', 'massage_booking_load_admin_functions', 9);
