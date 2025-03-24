@@ -97,15 +97,49 @@ function massage_booking_clean_admin_menu() {
         );
     }
     add_action('admin_menu', 'massage_booking_clean_admin_menu', 999);
-    if (!function_exists('massage_booking_dashboard_page')) {
     
+    if (!function_exists('massage_booking_dashboard_page')) {
         function massage_booking_dashboard_page() {
-            echo '<div class="wrap">';
-            echo '<h1>Massage Booking Dashboard</h1>';
-            echo '<p>Welcome to the Massage Booking System dashboard.</p>';
-            echo '</div>';
+            // Check user capabilities
+            if (!current_user_can('manage_options')) {
+                wp_die(__('You do not have sufficient permissions to access this page.', 'massage-booking'));
+            }
+
+            echo '<div class="wrap massage-booking-admin">';
+            echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
+
+            echo '<div class="dashboard-stats">';
+            echo '<div class="stat-card">';
+            echo '<h3>Total Appointments</h3>';
+
+            global $wpdb;
+            $table_name = $wpdb->prefix . 'massage_appointments';
+            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$table_name}'") === $table_name;
+
+            if ($table_exists) {
+                $total_count = $wpdb->get_var("SELECT COUNT(*) FROM {$table_name}");
+                echo '<div class="stat-number">' . esc_html($total_count) . '</div>';
+            } else {
+                echo '<div class="stat-number">0</div>';
+                echo '<p>Appointments table not found. Please deactivate and reactivate the plugin.</p>';
+            }
+
+            echo '</div>'; // stat-card
+            echo '</div>'; // dashboard-stats
+
+            echo '<div class="dashboard-section">';
+            echo '<h2>Quick Links</h2>';
+            echo '<div class="quick-links">';
+            echo '<a href="?page=massage-booking-appointments" class="button">Manage Appointments</a> ';
+            echo '<a href="?page=massage-booking-settings" class="button">Settings</a> ';
+            echo '<a href="?page=massage-booking-debug" class="button">Debug Information</a>';
+            echo '</div>'; // quick-links
+            echo '</div>'; // dashboard-section
+
+            echo '</div>'; // wrap
         }
     }
+
     /**
      * Add pending appointments count to admin menu
      */
@@ -481,21 +515,58 @@ function massage_booking_clean_admin_menu() {
     /**
      * Settings page (Placeholder function)
      */
-    function massage_booking_settings_page() {
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.', 'massage-booking'));
+    if (!function_exists('massage_booking_settings_page')) {
+        function massage_booking_settings_page() {
+            // Check if we should use the existing function
+            if (function_exists('massage_booking_settings_page_original')) {
+                return massage_booking_settings_page_original();
+            }
+
+            // Fallback implementation
+            if (!current_user_can('manage_options')) {
+                wp_die(__('You do not have sufficient permissions to access this page.', 'massage-booking'));
+            }
+
+            echo '<div class="wrap massage-booking-admin">';
+            echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
+
+            // Basic settings form
+            echo '<form method="post" action="options.php">';
+            settings_fields('massage_booking_settings');
+            do_settings_sections('massage_booking_settings');
+
+            // Business Information
+            echo '<h2>Business Information</h2>';
+            echo '<table class="form-table">';
+
+            echo '<tr>';
+            echo '<th scope="row"><label for="business_name">Business Name</label></th>';
+            echo '<td><input name="massage_booking_business_name" type="text" id="business_name" value="' . esc_attr(get_option('massage_booking_business_name', 'Massage Therapy Practice')) . '" class="regular-text"></td>';
+            echo '</tr>';
+
+            echo '<tr>';
+            echo '<th scope="row"><label for="business_email">Business Email</label></th>';
+            echo '<td><input name="massage_booking_business_email" type="email" id="business_email" value="' . esc_attr(get_option('massage_booking_business_email', get_option('admin_email'))) . '" class="regular-text"></td>';
+            echo '</tr>';
+
+            echo '</table>';
+
+            submit_button('Save Settings');
+            echo '</form>';
+
+            echo '</div>'; // wrap
+
+            // Register settings
+            register_setting('massage_booking_settings', 'massage_booking_business_name');
+            register_setting('massage_booking_settings', 'massage_booking_business_email');
         }
-        
-        ?>
-        <div class="wrap massage-booking-admin">
-            <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
-            <div class="card">
-                <h2>Booking System Settings</h2>
-                <p>Settings configuration coming soon.</p>
-            </div>
-        </div>
-        <?php
+
+        // Only run if the original function exists
+        if (function_exists('massage_booking_settings_page')) {
+            function massage_booking_settings_page_original() {
+                return massage_booking_settings_page();
+            }
+        }
     }
 
     // Use the display_appointment_details function from the original implementation
@@ -856,268 +927,175 @@ function massage_booking_clean_admin_menu() {
     /**
  * Appointments page content with full functionality
  */
-function massage_booking_appointments_page() {
-    // Check user capabilities
-    if (!current_user_can('manage_options')) {
-        return;
-    }
-    
-    // Check if database class exists
-    if (!class_exists('Massage_Booking_Database')) {
-        echo '<div class="wrap massage-booking-admin">';
-        echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
-        echo '<div class="notice notice-error"><p>Error: Database class not found.</p></div>';
-        echo '</div>';
-        return;
-    }
-    
-    global $wpdb;
-    $appointments_table = $wpdb->prefix . 'massage_appointments';
-    
-    // Check if appointments table exists
-    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$appointments_table'") === $appointments_table;
-    
-    if (!$table_exists) {
-        echo '<div class="wrap massage-booking-admin">';
-        echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
-        echo '<div class="notice notice-error"><p>Error: Appointments table not found. Please deactivate and reactivate the plugin.</p></div>';
-        echo '</div>';
-        return;
-    }
-    
-    // Handle actions
-    $action = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : '';
-    $appointment_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-    $nonce = isset($_GET['_wpnonce']) ? sanitize_text_field($_GET['_wpnonce']) : '';
-    
-    // Action handling
-    if (!empty($action) && !empty($appointment_id)) {
-        $db = new Massage_Booking_Database();
-        
-        // View single appointment
-        if ($action === 'view') {
-            display_appointment_details($appointment_id);
+    function massage_booking_appointments_page() {
+        // Check user capabilities
+        if (!current_user_can('manage_options')) {
             return;
         }
-        
-        // Handle status changes
-        if (in_array($action, ['confirm', 'cancel', 'delete']) && wp_verify_nonce($nonce, 'massage_booking_' . $action . '_' . $appointment_id)) {
-            if ($action === 'confirm' && method_exists($db, 'update_appointment_status')) {
-                $db->update_appointment_status($appointment_id, 'confirmed');
-                echo '<div class="notice notice-success"><p>Appointment confirmed successfully.</p></div>';
-            } else if ($action === 'cancel' && method_exists($db, 'update_appointment_status')) {
-                $db->update_appointment_status($appointment_id, 'cancelled');
-                echo '<div class="notice notice-success"><p>Appointment cancelled successfully.</p></div>';
-            } else if ($action === 'delete' && method_exists($db, 'delete_appointment')) {
-                $db->delete_appointment($appointment_id);
-                echo '<div class="notice notice-success"><p>Appointment deleted successfully.</p></div>';
-            }
+
+        // Check if database class exists
+        if (!class_exists('Massage_Booking_Database')) {
+            echo '<div class="wrap massage-booking-admin">';
+            echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
+            echo '<div class="notice notice-error"><p>Error: Database class not found.</p></div>';
+            echo '</div>';
+            return;
         }
-    }
-    
-    // Pagination
-    $page = isset($_GET['paged']) ? intval($_GET['paged']) : 1;
-    $per_page = 20; // Number of appointments per page
-    $offset = ($page - 1) * $per_page;
-    
-    // Filtering options
-    $status_filter = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
-    $date_from = isset($_GET['date_from']) ? sanitize_text_field($_GET['date_from']) : '';
-    $date_to = isset($_GET['date_to']) ? sanitize_text_field($_GET['date_to']) : '';
-    $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
-    
-    // Build query
-    $where_clauses = [];
-    $query_args = [];
-    
-    // Status filter
-    if (!empty($status_filter)) {
-        $where_clauses[] = "status = %s";
-        $query_args[] = $status_filter;
-    }
-    
-    // Date range filter
-    if (!empty($date_from)) {
-        $where_clauses[] = "appointment_date >= %s";
-        $query_args[] = $date_from;
-    }
-    
-    if (!empty($date_to)) {
-        $where_clauses[] = "appointment_date <= %s";
-        $query_args[] = $date_to;
-    }
-    
-    // Search filter
-    if (!empty($search)) {
-        $where_clauses[] = "(full_name LIKE %s OR email LIKE %s OR phone LIKE %s)";
-        $search_term = '%' . $wpdb->esc_like($search) . '%';
-        $query_args[] = $search_term;
-        $query_args[] = $search_term;
-        $query_args[] = $search_term;
-    }
-    
-    // Construct base query
-    $base_query = "SELECT * FROM $appointments_table";
-    $count_query = "SELECT COUNT(*) FROM $appointments_table";
-    
-    // Add WHERE clause if needed
-    if (!empty($where_clauses)) {
-        $where_sql = " WHERE " . implode(" AND ", $where_clauses);
-        $base_query .= $where_sql;
-        $count_query .= $where_sql;
-    }
-    
-    // Add ordering
-    $base_query .= " ORDER BY appointment_date DESC, start_time DESC";
-    
-    // Add pagination
-    $base_query .= $wpdb->prepare(" LIMIT %d OFFSET %d", $per_page, $offset);
-    
-    // Prepare and execute queries
-    $query = !empty($query_args) ? $wpdb->prepare($base_query, $query_args) : $base_query;
-    $count_query = !empty($query_args) ? $wpdb->prepare($count_query, $query_args) : $count_query;
-    
-    // Get appointments
-    $appointments = $wpdb->get_results($query);
-    
-    // Get total count for pagination
-    $total_appointments = $wpdb->get_var($count_query);
-    $total_pages = ceil($total_appointments / $per_page);
-    
-    // Start output
-    echo '<div class="wrap massage-booking-admin">';
-    echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
-    
-    // Appointments filter form
-    echo '<form method="get" action="">';
-    echo '<input type="hidden" name="page" value="massage-booking-appointments">';
-    
-    echo '<div class="tablenav top">';
-    echo '<div class="alignleft actions">';
-    
-    // Status dropdown
-    echo '<select name="status">';
-    echo '<option value="">All Statuses</option>';
-    $statuses = ['confirmed', 'pending', 'cancelled'];
-    foreach ($statuses as $status) {
-        echo '<option value="' . esc_attr($status) . '" ' . 
-             selected($status_filter, $status, false) . '>' . 
-             esc_html(ucfirst($status)) . '</option>';
-    }
-    echo '</select>';
-    
-    // Date range inputs
-    echo ' From: <input type="date" name="date_from" value="' . esc_attr($date_from) . '">';
-    echo ' To: <input type="date" name="date_to" value="' . esc_attr($date_to) . '">';
-    
-    // Search input
-    echo ' <input type="search" name="s" placeholder="Search..." value="' . esc_attr($search) . '">';
-    
-    // Submit button
-    echo ' <input type="submit" class="button" value="Filter">';
-    
-    // Reset button if any filter is active
-    if (!empty($status_filter) || !empty($date_from) || !empty($date_to) || !empty($search)) {
-        echo ' <a href="?page=massage-booking-appointments" class="button">Reset Filters</a>';
-    }
-    
-    echo '</div>'; // alignleft actions
-    
-    // Pagination links
-    if ($total_pages > 1) {
-        echo '<div class="tablenav-pages">';
-        echo paginate_links([
-            'base' => add_query_arg('paged', '%#%'),
-            'format' => '',
-            'prev_text' => '&laquo;',
-            'next_text' => '&raquo;',
-            'total' => $total_pages,
-            'current' => $page
-        ]);
-        echo '</div>';
-    }
-    
-    echo '</div>'; // tablenav top
-    
-    echo '</form>';
-    
-    // Appointments table
-    if (empty($appointments)) {
-        echo '<p>No appointments found.</p>';
-    } else {
-        echo '<table class="wp-list-table widefat fixed striped">';
-        echo '<thead><tr>';
-        echo '<th>ID</th><th>Client Name</th><th>Date</th><th>Time</th><th>Duration</th><th>Status</th><th>Actions</th>';
-        echo '</tr></thead><tbody>';
-        
-        foreach ($appointments as $appointment) {
-            echo '<tr>';
-            echo '<td>' . esc_html($appointment->id) . '</td>';
-            
-            // Try to decrypt name if possible
-            $client_name = $appointment->full_name;
-            if (class_exists('Massage_Booking_Encryption')) {
-                $encryption = new Massage_Booking_Encryption();
-                try {
-                    $decrypted_name = $encryption->decrypt($appointment->full_name);
-                    if ($decrypted_name) {
-                        $client_name = $decrypted_name;
-                    }
-                } catch (Exception $e) {
-                    // Use original name if decryption fails
+
+        global $wpdb;
+        $appointments_table = $wpdb->prefix . 'massage_appointments';
+
+        // Check if appointments table exists
+        $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$appointments_table'") === $appointments_table;
+
+        if (!$table_exists) {
+            echo '<div class="wrap massage-booking-admin">';
+            echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
+            echo '<div class="notice notice-error"><p>Error: Appointments table not found. Please deactivate and reactivate the plugin.</p></div>';
+            echo '</div>';
+            return;
+        }
+
+        // Handle actions
+        $action = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : '';
+        $appointment_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+        $nonce = isset($_GET['_wpnonce']) ? sanitize_text_field($_GET['_wpnonce']) : '';
+
+        // Action handling
+        if (!empty($action) && !empty($appointment_id)) {
+            $db = new Massage_Booking_Database();
+
+            // View single appointment
+            if ($action === 'view') {
+                display_appointment_details($appointment_id);
+                return;
+            }
+
+            // Handle status changes
+            if (in_array($action, ['confirm', 'cancel', 'delete']) && wp_verify_nonce($nonce, 'massage_booking_' . $action . '_' . $appointment_id)) {
+                if ($action === 'confirm' && method_exists($db, 'update_appointment_status')) {
+                    $db->update_appointment_status($appointment_id, 'confirmed');
+                    echo '<div class="notice notice-success"><p>Appointment confirmed successfully.</p></div>';
+                } else if ($action === 'cancel' && method_exists($db, 'update_appointment_status')) {
+                    $db->update_appointment_status($appointment_id, 'cancelled');
+                    echo '<div class="notice notice-success"><p>Appointment cancelled successfully.</p></div>';
+                } else if ($action === 'delete' && method_exists($db, 'delete_appointment')) {
+                    $db->delete_appointment($appointment_id);
+                    echo '<div class="notice notice-success"><p>Appointment deleted successfully.</p></div>';
                 }
             }
-            
-            echo '<td>' . esc_html($client_name) . '</td>';
-            
-            // Format date
-            $date = new DateTime($appointment->appointment_date);
-            echo '<td>' . esc_html($date->format('M j, Y')) . '</td>';
-            
-            // Format time
-            $start_time = new DateTime($appointment->start_time);
-            echo '<td>' . esc_html($start_time->format('g:i a')) . '</td>';
-            
-            echo '<td>' . esc_html($appointment->duration) . ' min</td>';
-            
-            // Status with styling
-            $status_class = '';
-            switch ($appointment->status) {
-                case 'confirmed':
-                    $status_class = 'status-confirmed';
-                    break;
-                case 'pending':
-                    $status_class = 'status-pending';
-                    break;
-                case 'cancelled':
-                    $status_class = 'status-cancelled';
-                    break;
-            }
-            echo '<td><span class="' . esc_attr($status_class) . '">' . esc_html(ucfirst($appointment->status)) . '</span></td>';
-            
-            // Actions
-            echo '<td>';
-            echo '<a href="?page=massage-booking-appointments&action=view&id=' . esc_attr($appointment->id) . '" class="button button-small">View</a> ';
-            
-            if ($appointment->status === 'pending') {
-                echo '<a href="' . wp_nonce_url('?page=massage-booking-appointments&action=confirm&id=' . $appointment->id, 'massage_booking_confirm_' . $appointment->id) . '" class="button button-small">Confirm</a> ';
-            }
-            
-            if ($appointment->status !== 'cancelled') {
-                echo '<a href="' . wp_nonce_url('?page=massage-booking-appointments&action=cancel&id=' . $appointment->id, 'massage_booking_cancel_' . $appointment->id) . '" class="button button-small">Cancel</a> ';
-            }
-            
-            echo '<a href="' . wp_nonce_url('?page=massage-booking-appointments&action=delete&id=' . $appointment->id, 'massage_booking_delete_' . $appointment->id) . '" class="button button-small" onclick="return confirm(\'Are you sure you want to delete this appointment?\');">Delete</a>';
-            
-            echo '</td>';
-            echo '</tr>';
         }
-        
-        echo '</tbody></table>';
-        
-        // Bottom pagination
+
+        // Pagination
+        $page = isset($_GET['paged']) ? intval($_GET['paged']) : 1;
+        $per_page = 20; // Number of appointments per page
+        $offset = ($page - 1) * $per_page;
+
+        // Filtering options
+        $status_filter = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
+        $date_from = isset($_GET['date_from']) ? sanitize_text_field($_GET['date_from']) : '';
+        $date_to = isset($_GET['date_to']) ? sanitize_text_field($_GET['date_to']) : '';
+        $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
+
+        // Build query
+        $where_clauses = [];
+        $query_args = [];
+
+        // Status filter
+        if (!empty($status_filter)) {
+            $where_clauses[] = "status = %s";
+            $query_args[] = $status_filter;
+        }
+
+        // Date range filter
+        if (!empty($date_from)) {
+            $where_clauses[] = "appointment_date >= %s";
+            $query_args[] = $date_from;
+        }
+
+        if (!empty($date_to)) {
+            $where_clauses[] = "appointment_date <= %s";
+            $query_args[] = $date_to;
+        }
+
+        // Search filter
+        if (!empty($search)) {
+            $where_clauses[] = "(full_name LIKE %s OR email LIKE %s OR phone LIKE %s)";
+            $search_term = '%' . $wpdb->esc_like($search) . '%';
+            $query_args[] = $search_term;
+            $query_args[] = $search_term;
+            $query_args[] = $search_term;
+        }
+
+        // Construct base query
+        $base_query = "SELECT * FROM $appointments_table";
+        $count_query = "SELECT COUNT(*) FROM $appointments_table";
+
+        // Add WHERE clause if needed
+        if (!empty($where_clauses)) {
+            $where_sql = " WHERE " . implode(" AND ", $where_clauses);
+            $base_query .= $where_sql;
+            $count_query .= $where_sql;
+        }
+
+        // Add ordering
+        $base_query .= " ORDER BY appointment_date DESC, start_time DESC";
+
+        // Add pagination
+        $base_query .= $wpdb->prepare(" LIMIT %d OFFSET %d", $per_page, $offset);
+
+        // Prepare and execute queries
+        $query = !empty($query_args) ? $wpdb->prepare($base_query, $query_args) : $base_query;
+        $count_query = !empty($query_args) ? $wpdb->prepare($count_query, $query_args) : $count_query;
+
+        // Get appointments
+        $appointments = $wpdb->get_results($query);
+
+        // Get total count for pagination
+        $total_appointments = $wpdb->get_var($count_query);
+        $total_pages = ceil($total_appointments / $per_page);
+
+        // Start output
+        echo '<div class="wrap massage-booking-admin">';
+        echo '<h1>' . esc_html(get_admin_page_title()) . '</h1>';
+
+        // Appointments filter form
+        echo '<form method="get" action="">';
+        echo '<input type="hidden" name="page" value="massage-booking-appointments">';
+
+        echo '<div class="tablenav top">';
+        echo '<div class="alignleft actions">';
+
+        // Status dropdown
+        echo '<select name="status">';
+        echo '<option value="">All Statuses</option>';
+        $statuses = ['confirmed', 'pending', 'cancelled'];
+        foreach ($statuses as $status) {
+            echo '<option value="' . esc_attr($status) . '" ' . 
+                 selected($status_filter, $status, false) . '>' . 
+                 esc_html(ucfirst($status)) . '</option>';
+        }
+        echo '</select>';
+
+        // Date range inputs
+        echo ' From: <input type="date" name="date_from" value="' . esc_attr($date_from) . '">';
+        echo ' To: <input type="date" name="date_to" value="' . esc_attr($date_to) . '">';
+
+        // Search input
+        echo ' <input type="search" name="s" placeholder="Search..." value="' . esc_attr($search) . '">';
+
+        // Submit button
+        echo ' <input type="submit" class="button" value="Filter">';
+
+        // Reset button if any filter is active
+        if (!empty($status_filter) || !empty($date_from) || !empty($date_to) || !empty($search)) {
+            echo ' <a href="?page=massage-booking-appointments" class="button">Reset Filters</a>';
+        }
+
+        echo '</div>'; // alignleft actions
+
+        // Pagination links
         if ($total_pages > 1) {
-            echo '<div class="tablenav bottom">';
             echo '<div class="tablenav-pages">';
             echo paginate_links([
                 'base' => add_query_arg('paged', '%#%'),
@@ -1128,10 +1106,103 @@ function massage_booking_appointments_page() {
                 'current' => $page
             ]);
             echo '</div>';
-            echo '</div>';
         }
+
+        echo '</div>'; // tablenav top
+
+        echo '</form>';
+
+        // Appointments table
+        if (empty($appointments)) {
+            echo '<p>No appointments found.</p>';
+        } else {
+            echo '<table class="wp-list-table widefat fixed striped">';
+            echo '<thead><tr>';
+            echo '<th>ID</th><th>Client Name</th><th>Date</th><th>Time</th><th>Duration</th><th>Status</th><th>Actions</th>';
+            echo '</tr></thead><tbody>';
+
+            foreach ($appointments as $appointment) {
+                echo '<tr>';
+                echo '<td>' . esc_html($appointment->id) . '</td>';
+
+                // Try to decrypt name if possible
+                $client_name = $appointment->full_name;
+                if (class_exists('Massage_Booking_Encryption')) {
+                    $encryption = new Massage_Booking_Encryption();
+                    try {
+                        $decrypted_name = $encryption->decrypt($appointment->full_name);
+                        if ($decrypted_name) {
+                            $client_name = $decrypted_name;
+                        }
+                    } catch (Exception $e) {
+                        // Use original name if decryption fails
+                    }
+                }
+
+                echo '<td>' . esc_html($client_name) . '</td>';
+
+                // Format date
+                $date = new DateTime($appointment->appointment_date);
+                echo '<td>' . esc_html($date->format('M j, Y')) . '</td>';
+
+                // Format time
+                $start_time = new DateTime($appointment->start_time);
+                echo '<td>' . esc_html($start_time->format('g:i a')) . '</td>';
+
+                echo '<td>' . esc_html($appointment->duration) . ' min</td>';
+
+                // Status with styling
+                $status_class = '';
+                switch ($appointment->status) {
+                    case 'confirmed':
+                        $status_class = 'status-confirmed';
+                        break;
+                    case 'pending':
+                        $status_class = 'status-pending';
+                        break;
+                    case 'cancelled':
+                        $status_class = 'status-cancelled';
+                        break;
+                }
+                echo '<td><span class="' . esc_attr($status_class) . '">' . esc_html(ucfirst($appointment->status)) . '</span></td>';
+
+                // Actions
+                echo '<td>';
+                echo '<a href="?page=massage-booking-appointments&action=view&id=' . esc_attr($appointment->id) . '" class="button button-small">View</a> ';
+
+                if ($appointment->status === 'pending') {
+                    echo '<a href="' . wp_nonce_url('?page=massage-booking-appointments&action=confirm&id=' . $appointment->id, 'massage_booking_confirm_' . $appointment->id) . '" class="button button-small">Confirm</a> ';
+                }
+
+                if ($appointment->status !== 'cancelled') {
+                    echo '<a href="' . wp_nonce_url('?page=massage-booking-appointments&action=cancel&id=' . $appointment->id, 'massage_booking_cancel_' . $appointment->id) . '" class="button button-small">Cancel</a> ';
+                }
+
+                echo '<a href="' . wp_nonce_url('?page=massage-booking-appointments&action=delete&id=' . $appointment->id, 'massage_booking_delete_' . $appointment->id) . '" class="button button-small" onclick="return confirm(\'Are you sure you want to delete this appointment?\');">Delete</a>';
+
+                echo '</td>';
+                echo '</tr>';
+            }
+
+            echo '</tbody></table>';
+
+            // Bottom pagination
+            if ($total_pages > 1) {
+                echo '<div class="tablenav bottom">';
+                echo '<div class="tablenav-pages">';
+                echo paginate_links([
+                    'base' => add_query_arg('paged', '%#%'),
+                    'format' => '',
+                    'prev_text' => '&laquo;',
+                    'next_text' => '&raquo;',
+                    'total' => $total_pages,
+                    'current' => $page
+                ]);
+                echo '</div>';
+                echo '</div>';
+            }
+        }
+
+        echo '</div>'; // End wrap
     }
-    
-    echo '</div>'; // End wrap
-}
 }
