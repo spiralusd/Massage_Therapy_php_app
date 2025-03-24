@@ -162,62 +162,72 @@ if (!function_exists('massage_booking_dashboard_page')) {
 /**
  * Create a centralized function loader to prevent multiple declarations
  */
-function massage_booking_load_admin_functions() {
-    // Make sure these functions are only declared once
-    $admin_functions = [
-        'massage_booking_appointments_page',
-        'massage_booking_settings_page',
-        'massage_booking_logs_page',
-        'massage_booking_debug_page',
-        'massage_booking_email_verification_page',
-        'reset_ms_auth_page',
-        'display_appointment_details'
-    ];
-    
-    foreach ($admin_functions as $function) {
-        // Check if function already exists to prevent redeclaration
-        if (function_exists($function)) {
-            // Function already exists, no need to declare it again
-            continue;
-        }
-        
-        // Load specific files based on which function we need
-        switch ($function) {
-            case 'massage_booking_appointments_page':
-                // Load appointments page function
-                if (file_exists(plugin_dir_path(__FILE__) . 'admin/admin-page.php')) {
-                    require_once plugin_dir_path(__FILE__) . 'admin/admin-page.php';
-                } else if (file_exists(plugin_dir_path(__FILE__) . 'massage-booking-fixes.php')) {
-                    require_once plugin_dir_path(__FILE__) . 'massage-booking-fixes.php';
+// Add a flag to ensure the function is only loaded once
+    if (!function_exists('massage_booking_load_admin_functions')) {
+        /**
+         * Create a centralized function loader to prevent multiple declarations
+         */
+        function massage_booking_load_admin_functions() {
+            // Unique flag to track if this function has been run
+            static $admin_functions_loaded = false;
+
+            // Exit if already loaded
+            if ($admin_functions_loaded) {
+                return;
+            }
+
+            // Mark as loaded
+            $admin_functions_loaded = true;
+
+            // Make sure these functions are only declared once
+            $admin_functions = [
+                'massage_booking_dashboard_page',
+                'massage_booking_appointments_page',
+                'massage_booking_settings_page',
+                'massage_booking_logs_page',
+                'massage_booking_debug_page',
+                'massage_booking_email_verification_page',
+                'reset_ms_auth_page',
+                'display_appointment_details'
+            ];
+
+            foreach ($admin_functions as $function) {
+                // Check if function already exists to prevent redeclaration
+                if (function_exists($function)) {
+                    // Function already exists, no need to declare it again
+                    continue;
                 }
-                break;
-                
-            case 'massage_booking_settings_page':
-                // Load settings page function
-                if (file_exists(plugin_dir_path(__FILE__) . 'admin/settings-page.php')) {
-                    require_once plugin_dir_path(__FILE__) . 'admin/settings-page.php';
-                } else if (file_exists(plugin_dir_path(__FILE__) . 'massage-booking-fixes.php')) {
-                    require_once plugin_dir_path(__FILE__) . 'massage-booking-fixes.php';
+
+                // Load specific files based on which function we need
+                switch ($function) {
+                    case 'massage_booking_appointments_page':
+                    case 'massage_booking_settings_page':
+                    case 'massage_booking_logs_page':
+                        // Prioritize admin-page.php
+                        if (file_exists(plugin_dir_path(__FILE__) . 'admin/admin-page.php')) {
+                            require_once plugin_dir_path(__FILE__) . 'admin/admin-page.php';
+                        } else if (file_exists(plugin_dir_path(__FILE__) . 'massage-booking-fixes.php')) {
+                            require_once plugin_dir_path(__FILE__) . 'massage-booking-fixes.php';
+                        }
+                        break;
+
+                    default:
+                        // For other functions, check both possible files
+                        if (file_exists(plugin_dir_path(__FILE__) . 'admin/admin-page.php') && 
+                            !function_exists($function)) {
+                            require_once plugin_dir_path(__FILE__) . 'admin/admin-page.php';
+                        } else if (file_exists(plugin_dir_path(__FILE__) . 'massage-booking-fixes.php') && 
+                            !function_exists($function)) {
+                            require_once plugin_dir_path(__FILE__) . 'massage-booking-fixes.php';
+                        }
+                        break;
                 }
-                break;
-                
-            // Add other cases as needed
-            default:
-                // For any other functions, check both possible files
-                if (file_exists(plugin_dir_path(__FILE__) . 'admin/admin-page.php') && 
-                    !function_exists($function)) {
-                    require_once plugin_dir_path(__FILE__) . 'admin/admin-page.php';
-                } else if (file_exists(plugin_dir_path(__FILE__) . 'massage-booking-fixes.php') && 
-                    !function_exists($function)) {
-                    require_once plugin_dir_path(__FILE__) . 'massage-booking-fixes.php';
-                }
-                break;
+            }
         }
     }
-}
 
-// Add hook to load functions at the right time
-add_action('admin_menu', 'massage_booking_load_admin_functions', 9);
+    // Modify the hook to use a unique priority
+    add_action('admin_menu', 'massage_booking_load_admin_functions', 9);
 
 function massage_booking_load_admin_functions() {
     // Prioritize the admin-page.php implementation
