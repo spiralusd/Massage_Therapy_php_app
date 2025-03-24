@@ -340,7 +340,7 @@
                             if (settings.prices && settings.prices[value]) {
                                 const priceElement = option.querySelector('.price');
                                 if (priceElement) {
-                                    priceElement.textContent = ' + settings.prices[value]';
+                                    priceElement.textContent = '$' + settings.prices[value];
                                 }
                             }
                         }
