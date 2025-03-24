@@ -100,7 +100,6 @@ if (!function_exists('massage_booking_clean_admin_menu')) {
             'reset_ms_auth_page'
         );
     }
-    add_action('admin_menu', 'massage_booking_clean_admin_menu', 999);
     
     if (!function_exists('massage_booking_dashboard_page')) {
         function massage_booking_dashboard_page() {
@@ -1210,3 +1209,5 @@ if (!function_exists('massage_booking_clean_admin_menu')) {
         echo '</div>'; // End wrap
     }
 }
+// Register the menu once with high priority
+add_action('admin_menu', 'massage_booking_clean_admin_menu', 9999);
