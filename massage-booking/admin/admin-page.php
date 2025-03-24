@@ -517,7 +517,7 @@ if (!function_exists('massage_booking_clean_admin_menu')) {
 
     /**
      * Settings page (Placeholder function)
-     */
+     
     if (!function_exists('massage_booking_settings_page')) {
         function massage_booking_settings_page() {
             // Check if we should use the existing function
@@ -743,7 +743,7 @@ if (!function_exists('massage_booking_clean_admin_menu')) {
             echo '</div>'; // End wrap
         }
     }
-
+*/
     /**
      * Add admin stylesheet and scripts
      */
