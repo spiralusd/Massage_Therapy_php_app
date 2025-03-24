@@ -229,4 +229,4 @@ if (!function_exists('massage_booking_load_admin_functions')) {
 }
 
 // Register the function loader with a unique priority
-add_action('admin_menu', 'massage_booking_load_admin_functions', 9);
+//add_action('admin_menu', 'massage_booking_load_admin_functions', 9);

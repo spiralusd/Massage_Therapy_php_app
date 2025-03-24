@@ -387,8 +387,6 @@ add_action('plugins_loaded', function() {
     }
 });
 
-// Add admin menu
-add_action('admin_menu', 'massage_booking_clean_admin_menu', 999);
 
 /*
 // Clean admin menu function

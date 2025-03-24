@@ -14,7 +14,14 @@ if (!defined('WPINC')) {
 // Prevent multiple inclusions and function redefinitions
 if (!function_exists('massage_booking_clean_admin_menu')) {
     // Make sure this function runs at the right priority (10 is default)
-    add_action('admin_menu', 'massage_booking_clean_admin_menu', 10);
+    add_action('admin_menu', 'massage_booking_clean_admin_menu', 999);
+    
+    remove_menu_page('massage-booking');
+    global $submenu;
+    if (isset($submenu['massage-booking'])) {
+        unset($submenu['massage-booking']);
+    }
+    
 
 function massage_booking_clean_admin_menu() {
         // Create main menu
