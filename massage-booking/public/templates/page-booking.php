@@ -3,7 +3,8 @@
  * Template Name: Massage Booking Form
  *
  * A custom page template that displays the massage booking form.
- * This is a simplified version that resolves script conflicts.
+ * This is a fixed version that ensures content is properly displayed
+ * and includes debug tools for development environments.
  */
 
 // Exit if accessed directly or from admin
@@ -11,11 +12,14 @@ if (!defined('WPINC') || is_admin()) {
     exit;
 }
 
+// Force full output buffering to capture and modify entire page output
+ob_start();
 ?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
     <meta charset="<?php bloginfo('charset'); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?php wp_title('|', true, 'right'); ?><?php bloginfo('name'); ?></title>
     <?php wp_head(); ?>
     <style>
         /* Critical CSS for the booking form */
@@ -221,6 +225,30 @@ if (!defined('WPINC') || is_admin()) {
             z-index: 9999;
         }
         
+        /* Debug panel styling */
+        #debug-controls {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            z-index: 9999;
+        }
+        
+        #debugInfo {
+            display: none;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            background: #fff;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        
         @media (max-width: 768px) {
             .time-slots {
                 grid-template-columns: repeat(2, 1fr);
@@ -240,122 +268,65 @@ if (!defined('WPINC') || is_admin()) {
             100% { transform: rotate(360deg); }
         }
     </style>
+    
+    <?php
+    // Check if any scripts or styles are missing and add them
+    if (!wp_script_is('jquery', 'enqueued')) {
+        wp_enqueue_script('jquery');
+    }
+    
+    if (!wp_style_is('massage-booking-form-style', 'enqueued')) {
+        wp_enqueue_style(
+            'massage-booking-form-style',
+            MASSAGE_BOOKING_PLUGIN_URL . 'public/css/booking-form.css',
+            array(),
+            MASSAGE_BOOKING_VERSION
+        );
+    }
+    ?>
 </head>
 
-<body <?php body_class(); ?>>
+<body <?php body_class('massage-booking-template'); ?>>
     <?php wp_body_open(); ?>
     
     <div class="booking-container">
         <div class="booking-header">
             <h1><?php echo get_option('massage_booking_business_name', 'Massage Therapy Appointment Booking'); ?></h1>
+            <p>Schedule your appointment below</p>
         </div>
         
-        <form id="appointmentForm">
-            <!-- Personal Information -->
-            <div class="form-group">
-                <label for="fullName">Full Name:</label>
-                <input type="text" id="fullName" name="fullName" required aria-required="true">
-            </div>
+        <?php 
+        // Debug information for admins
+        if (defined('WP_DEBUG') && WP_DEBUG && current_user_can('manage_options')): 
+        ?>
+        <div style="margin-bottom: 20px; padding: 10px; background: #f8f8f8; border: 1px solid #ddd; font-size: 12px;">
+            <h3>Resource Loading Debug (Admin Only)</h3>
+            <ul>
+                <li>jQuery: <?php echo wp_script_is('jquery', 'enqueued') ? 'Loaded ✅' : 'Not Loaded ❌'; ?></li>
+                <li>CSS: <?php echo wp_style_is('massage-booking-form-style', 'enqueued') ? 'Loaded ✅' : 'Not Loaded ❌'; ?></li>
+                <li>Form JS: <?php echo wp_script_is('massage-booking-form-script', 'enqueued') ? 'Loaded ✅' : 'Not Loaded ❌'; ?></li>
+                <li>API Connector: <?php echo wp_script_is('massage-booking-api-connector', 'enqueued') ? 'Loaded ✅' : 'Not Loaded ❌'; ?></li>
+                <li>Function exists: <?php echo function_exists('massage_booking_display_form') ? 'Yes ✅' : 'No ❌'; ?></li>
+            </ul>
+        </div>
+        <?php endif; ?>
+        
+        <?php
+        // Load the booking form
+        if (function_exists('massage_booking_display_form')) {
+            massage_booking_display_form();
+        } else {
+            echo '<div class="form-error-message">';
+            echo '<p>Error: The booking form functionality is not available.</p>';
             
-            <div class="form-group">
-                <label for="email">Email Address:</label>
-                <input type="email" id="email" name="email" required aria-required="true">
-            </div>
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                echo '<p>Debug info: The <code>massage_booking_display_form</code> function is missing. ';
+                echo 'Please check if the plugin is properly activated and the file <code>public/booking-form.php</code> is being loaded.</p>';
+            }
             
-            <div class="form-group">
-                <label for="phone">Phone Number:</label>
-                <input type="tel" id="phone" name="phone" required aria-required="true">
-            </div>
-            
-            <!-- Service Selection -->
-            <div class="form-group">
-                <label>Select Service Duration:</label>
-                <div class="radio-group" id="serviceDuration" role="radiogroup" aria-label="Service Duration Options">
-                    <div class="radio-option" data-value="60" data-price="95">
-                        <input type="radio" name="duration" id="duration60" value="60" checked>
-                        <label for="duration60">60 Minutes <span class="price">$95</span></label>
-                    </div>
-                    <div class="radio-option" data-value="90" data-price="125">
-                        <input type="radio" name="duration" id="duration90" value="90">
-                        <label for="duration90">90 Minutes <span class="price">$125</span></label>
-                    </div>
-                    <div class="radio-option" data-value="120" data-price="165">
-                        <input type="radio" name="duration" id="duration120" value="120">
-                        <label for="duration120">120 Minutes <span class="price">$165</span></label>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Additional Services -->
-            <div class="form-group">
-                <label>Focus Areas (Select all that apply):</label>
-                <div class="checkbox-group" id="focusAreas" role="group" aria-label="Focus Areas Options">
-                    <div class="checkbox-option" data-value="back">
-                        <input type="checkbox" name="focus" id="focusBack" value="Back & Shoulders">
-                        <label for="focusBack">Back & Shoulders</label>
-                    </div>
-                    <div class="checkbox-option" data-value="neck">
-                        <input type="checkbox" name="focus" id="focusNeck" value="Neck & Upper Back">
-                        <label for="focusNeck">Neck & Upper Back</label>
-                    </div>
-                    <div class="checkbox-option" data-value="legs">
-                        <input type="checkbox" name="focus" id="focusLegs" value="Legs & Feet">
-                        <label for="focusLegs">Legs & Feet</label>
-                    </div>
-                    <div class="checkbox-option" data-value="full">
-                        <input type="checkbox" name="focus" id="focusFull" value="Full Body">
-                        <label for="focusFull">Full Body</label>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="pressurePreference">Pressure Preference:</label>
-                <select id="pressurePreference" name="pressurePreference">
-                    <option value="Light">Light</option>
-                    <option value="Medium" selected>Medium</option>
-                    <option value="Firm">Firm</option>
-                    <option value="Deep Tissue">Deep Tissue</option>
-                </select>
-            </div>
-            
-            <!-- Date Selection -->
-            <div class="form-group">
-                <label for="appointmentDate">Select Date:</label>
-                <input type="date" id="appointmentDate" name="appointmentDate" required data-available-days="1,2,3,4,5">
-                <small>Available days: Monday-Friday</small>
-            </div>
-            
-            <!-- Time Slots -->
-            <div class="form-group">
-                <label>Available Time Slots:</label>
-                <div class="time-slots" id="timeSlots">
-                    <p>Please select a date to see available time slots.</p>
-                </div>
-            </div>
-            
-            <!-- Special Requests -->
-            <div class="form-group">
-                <label for="specialRequests">Special Requests or Health Concerns:</label>
-                <textarea id="specialRequests" name="specialRequests" rows="4"></textarea>
-            </div>
-            
-            <!-- Summary Section -->
-            <div class="summary" id="bookingSummary">
-                <h3>Booking Summary</h3>
-                <p><strong>Service:</strong> <span id="summaryService"></span></p>
-                <p><strong>Focus Areas:</strong> <span id="summaryFocusAreas"></span></p>
-                <p><strong>Date & Time:</strong> <span id="summaryDateTime"></span></p>
-                <p><strong>Total Price:</strong> <span id="summaryPrice"></span></p>
-            </div>
-            
-            <!-- HIPAA Privacy Notice -->
-            <div class="privacy-notice">
-                <p><strong>Privacy Notice:</strong> This form is HIPAA compliant. Your personal and health information is protected and will only be used for appointment scheduling and to provide appropriate care. A 15-minute break is automatically scheduled between appointments for your privacy and comfort. By submitting this form, you consent to the collection and processing of your information for these purposes.</p>
-            </div>
-            
-            <button type="submit">Book Appointment</button>
-        </form>
+            echo '</div>';
+        }
+        ?>
         
         <div class="booking-footer">
             <p>&copy; <?php echo date('Y'); ?> <?php echo get_option('massage_booking_business_name', 'Massage Therapy Practice'); ?>. All rights reserved.</p>
@@ -364,56 +335,161 @@ if (!defined('WPINC') || is_admin()) {
     </div>
     
     <?php
-    // We need to manually enqueue our scripts in the correct order
-    wp_enqueue_script('jquery');
-    
-    // Enqueue form styles
-    wp_enqueue_style(
-        'massage-booking-form-style',
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/css/booking-form.css',
-        array(),
-        MASSAGE_BOOKING_VERSION
-    );
-    
-    // Enqueue base form script
-    wp_enqueue_script(
-        'massage-booking-form-script',
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/booking-form-optimized.js',
-        array('jquery'),
-        MASSAGE_BOOKING_VERSION,
-        true
-    );
-    
-    // Enqueue API connector
-    wp_enqueue_script(
-        'massage-booking-api-connector',
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-connector-optimized.js',
-        array('jquery', 'massage-booking-form-script'),
-        MASSAGE_BOOKING_VERSION,
-        true
-    );
-    
-    // Pass WordPress data to JavaScript
-    wp_localize_script('massage-booking-api-connector', 'massageBookingAPI', array(
-        'ajaxUrl' => admin_url('admin-ajax.php'),
-        'restUrl' => esc_url_raw(rest_url('massage-booking/v1/')),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'siteUrl' => get_site_url(),
-        'isLoggedIn' => is_user_logged_in() ? 'yes' : 'no',
-        'version' => MASSAGE_BOOKING_VERSION
-    ));
-    
-    // Enqueue form submission handler (must be last)
-    wp_enqueue_script(
-        'massage-booking-form-submit-fix',
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/form-submit-fix.js',
-        array('jquery', 'massage-booking-form-script', 'massage-booking-api-connector'),
-        MASSAGE_BOOKING_VERSION,
-        true
-    );
+    // Debug toggle (only in development)
+    if (defined('WP_DEBUG') && WP_DEBUG):
     ?>
+    <div id="debug-controls">
+        <button id="toggleDebug" class="button">Toggle Debug Mode</button>
+        <div id="debugInfo">
+            <h4>Debug Information</h4>
+            <div id="debugContent"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Debug mode toggle script
+        document.addEventListener('DOMContentLoaded', function() {
+            // Log initial form status to console
+            console.log('DOM loaded. Form exists:', !!document.getElementById('appointmentForm'));
+            
+            // Check if API connector initialized properly
+            if (typeof massageBookingAPI === 'undefined') {
+                console.error('massageBookingAPI data is not available');
+            } else {
+                console.log('massageBookingAPI is available:', massageBookingAPI);
+            }
+            
+            const toggleBtn = document.getElementById('toggleDebug');
+            const debugInfo = document.getElementById('debugInfo');
+            const debugContent = document.getElementById('debugContent');
+            
+            let debugMode = false;
+            
+            // Toggle debug panel
+            toggleBtn.addEventListener('click', function() {
+                debugMode = !debugMode;
+                debugInfo.style.display = debugMode ? 'block' : 'none';
+                toggleBtn.textContent = debugMode ? 'Hide Debug Info' : 'Toggle Debug Mode';
+                
+                if (debugMode) {
+                    // Collect debug information
+                    const formState = {
+                        fields: {},
+                        options: {},
+                        timeSlots: {},
+                        scripts: {
+                            'jQuery': typeof jQuery !== 'undefined',
+                            'massageBookingAPI': typeof massageBookingAPI !== 'undefined',
+                            'fetchAvailableTimeSlots': typeof window.fetchAvailableTimeSlots === 'function',
+                            'updateSummary': typeof window.updateSummary === 'function'
+                        },
+                        elements: {
+                            'appointmentForm': !!document.getElementById('appointmentForm'),
+                            'timeSlots': !!document.getElementById('timeSlots'),
+                            'bookingSummary': !!document.getElementById('bookingSummary'),
+                            'formElement': document.querySelector('form') ? document.querySelector('form').id : 'No form found'
+                        }
+                    };
+                    
+                    // Get form field values
+                    document.querySelectorAll('#appointmentForm input, #appointmentForm select, #appointmentForm textarea').forEach(el => {
+                        if (el.id) {
+                            formState.fields[el.id] = el.value;
+                        }
+                    });
+                    
+                    // Get selected radio/checkbox options
+                    document.querySelectorAll('#appointmentForm input[type="radio"]:checked, #appointmentForm input[type="checkbox"]:checked').forEach(el => {
+                        formState.options[el.name] = el.value;
+                    });
+                    
+                    // Get time slot information
+                    const selectedSlot = document.querySelector('.time-slot.selected');
+                    if (selectedSlot) {
+                        formState.timeSlots.selected = {
+                            time: selectedSlot.textContent,
+                            dataTime: selectedSlot.getAttribute('data-time'),
+                            dataEndTime: selectedSlot.getAttribute('data-end-time')
+                        };
+                    }
+                    
+                    // Show debug info
+                    debugContent.innerHTML = '<pre>' + JSON.stringify(formState, null, 2) + '</pre>';
+                    
+                    // Add a hook for time slot fetching
+                    if (typeof window.fetchAvailableTimeSlots === 'function') {
+                        const originalFetch = window.fetchAvailableTimeSlots;
+                        window.fetchAvailableTimeSlots = function(date, duration) {
+                            debugContent.innerHTML += `<div>API Call: Fetching slots for ${date}, duration ${duration}</div>`;
+                            return originalFetch(date, duration);
+                        };
+                    }
+                }
+            });
+            
+            // Auto-recovery if form not found
+            if (!document.getElementById('appointmentForm')) {
+                console.warn('Form not found - attempting auto-recovery');
+                // Try to find any form and assign the ID
+                const forms = document.querySelectorAll('form');
+                if (forms.length > 0) {
+                    forms[0].id = 'appointmentForm';
+                    console.log('Auto-recovery: ID assigned to found form', forms[0]);
+                }
+            }
+        });
+    </script>
+    <?php endif; ?>
+    
+    <?php
+    // We need to manually enqueue our scripts in the correct order
+    if (!wp_script_is('massage-booking-form-script', 'enqueued')) {
+        // Enqueue base form script
+        wp_enqueue_script(
+            'massage-booking-form-script',
+            MASSAGE_BOOKING_PLUGIN_URL . 'public/js/booking-form.js',
+            array('jquery'),
+            MASSAGE_BOOKING_VERSION,
+            true
+        );
+    }
+    
+    if (!wp_script_is('massage-booking-api-connector', 'enqueued')) {
+        // Enqueue API connector
+        wp_enqueue_script(
+            'massage-booking-api-connector',
+            MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-connector.js',
+            array('jquery', 'massage-booking-form-script'),
+            MASSAGE_BOOKING_VERSION,
+            true
+        );
+        
+        // Pass WordPress data to JavaScript
+        wp_localize_script('massage-booking-api-connector', 'massageBookingAPI', array(
+            'restUrl' => esc_url_raw(rest_url('massage-booking/v1/')),
+            'nonce' => wp_create_nonce('wp_rest'),
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'siteUrl' => get_site_url(),
+            'isLoggedIn' => is_user_logged_in() ? 'yes' : 'no',
+            'version' => MASSAGE_BOOKING_VERSION
+        ));
+        
+        // Add the debug toggle module here (step 4)
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+        wp_enqueue_script(
+            'massage-booking-debug-toggle',
+            MASSAGE_BOOKING_PLUGIN_URL . 'public/js/debug-toggle.js',
+            array('jquery', 'massage-booking-form-script'),
+            MASSAGE_BOOKING_VERSION,
+            true
+        );
+    }
+    ?>
+    
     <script type="text/javascript">
     jQuery(document).ready(function($) {
+        console.log("jQuery document ready event fired");
+        
         // Initialize radio buttons
         $('.radio-option').each(function() {
             // If the radio button is checked initially, add selected class
@@ -486,11 +562,19 @@ if (!defined('WPINC') || is_admin()) {
         
         // Load settings when page loads (if available)
         if (typeof window.loadSettings === 'function') {
-            window.loadSettings();
+            window.loadSettings().catch(error => {
+                console.error('Failed to load settings:', error);
+            });
         }
     });
     </script>
     
     <?php wp_footer(); ?>
 </body>
-</html>
+</html><?php
+// Output the buffer
+echo ob_get_clean();
+// Stop execution to prevent the theme's footer from loading
+exit;
+?>
+

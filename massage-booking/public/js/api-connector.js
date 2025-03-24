@@ -1,8 +1,8 @@
 /**
- * Massage Booking - API Connector - Consolidated Version
+ * Massage Booking - API Connector - Fixed Version
  * 
- * This script connects the booking form to WordPress REST API.
- * Version: 1.0.7
+ * This script connects the booking form to WordPress REST API with improved error handling.
+ * Version: 1.1.0
  */
 
 (function($) {
@@ -15,14 +15,48 @@
         
         // Check if form exists
         const appointmentForm = document.getElementById('appointmentForm');
-        if (!appointmentForm) {
-            console.error('Appointment form not found');
-            return;
-        }
         
+        // If form not found, try to look for it with different selectors
+        if (!appointmentForm) {
+            console.error('Appointment form not found with ID "appointmentForm"');
+            console.log('Trying alternative selectors...');
+            
+            // Try a few alternative selectors
+            const possibleForms = document.querySelectorAll('form.booking-form, .massage-booking-container form, .booking-form-container form');
+            
+            if (possibleForms.length > 0) {
+                console.log('Found alternative form:', possibleForms[0]);
+                // Assign the ID to the first form we find
+                possibleForms[0].id = 'appointmentForm';
+                
+                // Now continue with the updated reference
+                initializeBookingForm(possibleForms[0]);
+            } else {
+                console.error('No booking form found on page. Cannot initialize booking system.');
+                // Add visible error for site admin
+                const containers = document.querySelectorAll('.massage-booking-container, .booking-container, .booking-form-container');
+                if (containers.length > 0) {
+                    const errorMsg = document.createElement('div');
+                    errorMsg.style.color = 'red';
+                    errorMsg.style.padding = '15px';
+                    errorMsg.style.border = '1px solid red';
+                    errorMsg.style.marginTop = '20px';
+                    errorMsg.innerHTML = '<strong>Error:</strong> Booking form not found. Please check plugin installation.';
+                    containers[0].appendChild(errorMsg);
+                }
+                return;
+            }
+        } else {
+            // Form found, initialize it
+            initializeBookingForm(appointmentForm);
+        }
+    });
+    
+    function initializeBookingForm(form) {
         // Check if WordPress API data exists
         if (typeof massageBookingAPI === 'undefined') {
             console.error('WordPress API data not available');
+            reportError('API configuration missing. Please check plugin settings.');
             return;
         }
         
@@ -175,6 +209,29 @@
             }, 10000);
             
             document.body.appendChild(errorDiv);
+            return false;
+        };
+        
+        // Create a more visible error directly in the form
+        const reportError = function(message) {
+            // Create an error element
+            const errorEl = document.createElement('div');
+            errorEl.className = 'form-error-message';
+            errorEl.innerHTML = `<p><strong>Error:</strong> ${message}</p>`;
+            
+            // Find where to insert it (preferably at the top of the form)
+            if (form.firstChild) {
+                form.insertBefore(errorEl, form.firstChild);
+            } else {
+                form.appendChild(errorEl);
+            }
+            
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                if (errorEl.parentNode) {
+                    errorEl.parentNode.removeChild(errorEl);
+                }
+            }, 10000);
         };
         
         /**
@@ -283,7 +340,7 @@
                             if (settings.prices && settings.prices[value]) {
                                 const priceElement = option.querySelector('.price');
                                 if (priceElement) {
-                                    priceElement.textContent = '$' + settings.prices[value];
+                                    priceElement.textContent = ' + settings.prices[value];
                                 }
                             }
                         }
@@ -348,6 +405,7 @@
                 if (!slotsContainer) return { available: false, slots: [] };
                 
                 slotsContainer.innerHTML = '<p>Loading available times...</p>';
+                slotsContainer.classList.add('loading');
                 
                 // Generate a nonce for this request
                 const requestNonce = await generateNonce('check_slot_availability');
@@ -363,6 +421,9 @@
                         'Accept': 'application/json'
                     }
                 });
+                
+                // Remove loading class
+                slotsContainer.classList.remove('loading');
                 
                 if (!response.ok) {
                     throw new Error(`Failed to load time slots (HTTP ${response.status})`);
@@ -405,6 +466,7 @@
                 // Show error message
                 const slotsContainer = document.getElementById('timeSlots');
                 if (slotsContainer) {
+                    slotsContainer.classList.remove('loading');
                     slotsContainer.innerHTML = `
                         <p>Error loading available times. Please try again.</p>
                         <button class="retry-button">Retry</button>
@@ -434,6 +496,7 @@
             
             // Clear the container
             slotsContainer.innerHTML = '';
+            slotsContainer.classList.remove('loading');
             
             // Check if we have available slots
             if (!data.available || !data.slots || data.slots.length === 0) {
@@ -466,13 +529,20 @@
                     // Update appointment summary
                     if (typeof window.updateSummary === 'function') {
                         window.updateSummary();
+                    } else {
+                        // If the global function isn't available, try our own implementation
+                        updateSummary();
                     }
                     
                     // Save selection to session storage
-                    const formData = JSON.parse(sessionStorage.getItem('massageBookingFormData') || '{}');
-                    formData.selectedTimeSlot = slot.startTime;
-                    formData.selectedEndTime = slot.endTime;
-                    sessionStorage.setItem('massageBookingFormData', JSON.stringify(formData));
+                    try {
+                        const formData = JSON.parse(sessionStorage.getItem('massageBookingFormData') || '{}');
+                        formData.selectedTimeSlot = slot.startTime;
+                        formData.selectedEndTime = slot.endTime;
+                        sessionStorage.setItem('massageBookingFormData', JSON.stringify(formData));
+                    } catch (e) {
+                        console.warn('Could not save to session storage:', e);
+                    }
                 });
                 
                 slotsContainer.appendChild(slotElement);
@@ -480,169 +550,285 @@
         };
         
         /**
-         * Validate email format
+         * Update booking summary
+         * Local implementation in case the global function isn't available
          */
-        function validateEmail(email) {
-            const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-            return re.test(String(email).toLowerCase());
-        }
-        
-        /**
-         * Validate phone format
-         */
-        function validatePhone(phone) {
-            const re = /^\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})$/;
-            return re.test(String(phone));
-        }
-        
-        /**
-         * Enhanced client-side validation
-         */
-        function enhancedValidation() {
-            const errors = [];
+        const updateSummary = function() {
+            const summary = document.getElementById('bookingSummary');
+            if (!summary) return;
             
-            // Name validation
-            const nameField = document.getElementById('fullName');
-            if (!nameField.value.trim()) {
-                errors.push('Please enter your full name');
-                nameField.style.borderColor = 'red';
-                nameField.setAttribute('aria-invalid', 'true');
-            } else {
-                nameField.style.borderColor = '';
-                nameField.removeAttribute('aria-invalid');
-            }
-            
-            // Email validation
-            const emailField = document.getElementById('email');
-            if (!emailField.value.trim()) {
-                errors.push('Please enter your email address');
-                emailField.style.borderColor = 'red';
-                emailField.setAttribute('aria-invalid', 'true');
-            } else if (!validateEmail(emailField.value)) {
-                errors.push('Please enter a valid email address');
-                emailField.style.borderColor = 'red';
-                emailField.setAttribute('aria-invalid', 'true');
-            } else {
-                emailField.style.borderColor = '';
-                emailField.removeAttribute('aria-invalid');
-            }
-            
-            // Phone validation
-            const phoneField = document.getElementById('phone');
-            if (!phoneField.value.trim()) {
-                errors.push('Please enter your phone number');
-                phoneField.style.borderColor = 'red';
-                phoneField.setAttribute('aria-invalid', 'true');
-            } else if (!validatePhone(phoneField.value)) {
-                errors.push('Please enter a valid phone number');
-                phoneField.style.borderColor = 'red';
-                phoneField.setAttribute('aria-invalid', 'true');
-            } else {
-                phoneField.style.borderColor = '';
-                phoneField.removeAttribute('aria-invalid');
-            }
-            
-            // Date validation
-            const dateField = document.getElementById('appointmentDate');
-            if (!dateField.value) {
-                errors.push('Please select an appointment date');
-                dateField.style.borderColor = 'red';
-                dateField.setAttribute('aria-invalid', 'true');
-            } else {
-                dateField.style.borderColor = '';
-                dateField.removeAttribute('aria-invalid');
-            }
-            
-            // Duration validation
             const selectedDuration = document.querySelector('input[name="duration"]:checked');
-            if (!selectedDuration) {
-                errors.push('Please select a service duration');
-                document.getElementById('serviceDuration').style.borderColor = 'red';
-            } else {
-                document.getElementById('serviceDuration').style.borderColor = '';
-            }
+            const selectedTime = document.querySelector('.time-slot.selected');
+            const selectedDate = document.getElementById('appointmentDate')?.value;
             
-            // Time slot validation
-            const selectedTimeSlot = document.querySelector('.time-slot.selected');
-            if (!selectedTimeSlot) {
-                errors.push('Please select an appointment time');
-                if (document.getElementById('timeSlots')) {
-                    document.getElementById('timeSlots').style.borderColor = 'red';
+            if (selectedDuration && selectedTime && selectedDate) {
+                // Show summary
+                summary.classList.add('visible');
+                
+                // Update service
+                const durationValue = selectedDuration.value;
+                const durationPrice = selectedDuration.closest('.radio-option')?.getAttribute('data-price') || '0';
+                const summaryService = document.getElementById('summaryService');
+                if (summaryService) {
+                    summaryService.textContent = `${durationValue} Minutes Massage (${durationPrice})`;
+                }
+                
+                // Update focus areas
+                const selectedFocusAreas = Array.from(document.querySelectorAll('input[name="focus"]:checked'))
+                    .map(checkbox => checkbox.value);
+                const summaryFocusAreas = document.getElementById('summaryFocusAreas');
+                if (summaryFocusAreas) {
+                    summaryFocusAreas.textContent = selectedFocusAreas.length > 0 
+                        ? selectedFocusAreas.join(', ') 
+                        : 'No specific areas selected';
+                }
+                
+                // Format date
+                const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                // Update date & time
+                const summaryDateTime = document.getElementById('summaryDateTime');
+                if (summaryDateTime) {
+                    summaryDateTime.textContent = `${formattedDate} at ${selectedTime.textContent}`;
+                }
+                
+                // Update price
+                const summaryPrice = document.getElementById('summaryPrice');
+                if (summaryPrice) {
+                    summaryPrice.textContent = `${durationPrice}`;
                 }
             } else {
-                if (document.getElementById('timeSlots')) {
-                    document.getElementById('timeSlots').style.borderColor = '';
+                // Hide summary if not all required elements are selected
+                summary.classList.remove('visible');
+            }
+        };
+        
+        /**
+         * Form validation
+         */
+        const validateForm = function() {
+            let valid = true;
+            const errors = [];
+            
+            // Check required fields
+            const requiredFields = ['fullName', 'email', 'phone', 'appointmentDate'];
+            requiredFields.forEach(field => {
+                const element = document.getElementById(field);
+                if (!element || !element.value.trim()) {
+                    if (element) {
+                        element.style.borderColor = 'red';
+                        element.setAttribute('aria-invalid', 'true');
+                    }
+                    
+                    errors.push(field.replace(/([A-Z])/g, ' $1').trim());
+                    valid = false;
+                } else {
+                    if (element) {
+                        element.style.borderColor = '';
+                        element.removeAttribute('aria-invalid');
+                    }
+                }
+            });
+            
+            // Special validation for email format
+            const emailField = document.getElementById('email');
+            if (emailField && emailField.value.trim() && !isValidEmail(emailField.value)) {
+                emailField.style.borderColor = 'red';
+                emailField.setAttribute('aria-invalid', 'true');
+                errors.push('Valid Email Address');
+                valid = false;
+            }
+            
+            // Special validation for phone format
+            const phoneField = document.getElementById('phone');
+            if (phoneField && phoneField.value.trim() && !isValidPhone(phoneField.value)) {
+                phoneField.style.borderColor = 'red';
+                phoneField.setAttribute('aria-invalid', 'true');
+                errors.push('Valid Phone Number');
+                valid = false;
+            }
+            
+            // Check service duration
+            if (!document.querySelector('input[name="duration"]:checked')) {
+                const serviceDuration = document.getElementById('serviceDuration');
+                if (serviceDuration) {
+                    serviceDuration.style.borderColor = 'red';
+                }
+                errors.push('Service Duration');
+                valid = false;
+            } else {
+                const serviceDuration = document.getElementById('serviceDuration');
+                if (serviceDuration) {
+                    serviceDuration.style.borderColor = '';
+                }
+            }
+            
+            // Check time slot
+            if (!document.querySelector('.time-slot.selected')) {
+                const timeSlots = document.getElementById('timeSlots');
+                if (timeSlots) {
+                    timeSlots.style.borderColor = 'red';
+                }
+                errors.push('Time Slot');
+                valid = false;
+            } else {
+                const timeSlots = document.getElementById('timeSlots');
+                if (timeSlots) {
+                    timeSlots.style.borderColor = '';
                 }
             }
             
             // Display validation errors if any
-            if (errors.length > 0) {
-                // Remove any existing error containers
-                const existingErrors = document.querySelectorAll('.validation-errors');
-                existingErrors.forEach(el => el.parentNode.removeChild(el));
-                
-                // Create error message element
-                const errorContainer = document.createElement('div');
-                errorContainer.className = 'validation-errors';
-                errorContainer.setAttribute('role', 'alert');
-                errorContainer.innerHTML = `
-                    <h3>Please fix the following errors:</h3>
-                    <ul>${errors.map(error => `<li>${error}</li>`).join('')}</ul>
-                `;
-                
-                // Add styles
-                const style = document.createElement('style');
-                style.textContent = `
-                    .validation-errors {
-                        background-color: #f8d7da;
-                        color: #721c24;
-                        padding: 15px;
-                        margin-bottom: 20px;
-                        border: 1px solid #f5c6cb;
-                        border-radius: 4px;
-                    }
-                    .validation-errors ul {
-                        margin-top: 10px;
-                        padding-left: 20px;
-                    }
-                `;
-                document.head.appendChild(style);
-                
-                // Insert at top of form
-                const form = document.getElementById('appointmentForm');
-                if (form.firstChild) {
-                    form.insertBefore(errorContainer, form.firstChild);
-                } else {
-                    form.appendChild(errorContainer);
+            if (!valid) {
+                displayFormErrors(errors);
+            }
+            
+            return valid;
+        };
+        
+        /**
+         * Display form validation errors
+         */
+        const displayFormErrors = function(errors) {
+            // Remove any existing error messages
+            const existingErrors = document.querySelectorAll('.validation-errors');
+            existingErrors.forEach(el => el.parentNode.removeChild(el));
+            
+            // Create error message element
+            const errorContainer = document.createElement('div');
+            errorContainer.className = 'validation-errors';
+            errorContainer.setAttribute('role', 'alert');
+            errorContainer.innerHTML = `
+                <h3>Please fix the following errors:</h3>
+                <ul>${errors.map(error => `<li>${error}</li>`).join('')}</ul>
+            `;
+            
+            // Add to the form
+            if (form.firstChild) {
+                form.insertBefore(errorContainer, form.firstChild);
+            } else {
+                form.appendChild(errorContainer);
+            }
+            
+            // Scroll to errors
+            errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+            // Remove after 8 seconds
+            setTimeout(() => {
+                if (errorContainer.parentNode) {
+                    errorContainer.parentNode.removeChild(errorContainer);
                 }
-                
-                // Scroll to errors
-                errorContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                
-                // Remove after 8 seconds
-                setTimeout(() => {
-                    if (errorContainer.parentNode) {
-                        errorContainer.parentNode.removeChild(errorContainer);
-                    }
-                }, 8000);
-                
+            }, 8000);
+        };
+        
+        /**
+         * Validate email format
+         */
+        const isValidEmail = function(email) {
+            // Basic email validation regex
+            const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+            return re.test(String(email).toLowerCase());
+        };
+        
+        /**
+         * Validate phone number format
+         */
+        const isValidPhone = function(phone) {
+            // Flexible phone number validation - accepts various formats
+            return /^[\d\s()+\-\.]{7,20}$/.test(phone);
+        };
+        
+        /**
+         * Override the form submission
+         */
+        form.addEventListener('submit', async function(e) {
+            // Prevent the default form submission
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('Form submission intercepted');
+            
+            // Validate the form
+            if (!validateForm()) {
+                console.log('Form validation failed');
                 return false;
             }
             
-            return true;
+            // Show loader
+            const loader = showLoader();
+            
+            try {
+                // Collect form data
+                const formData = collectFormData();
+                
+                // Submit the form
+                const result = await submitForm(formData);
+                
+                // Handle success
+                console.log('Appointment successfully created:', result);
+                
+                // Show success message
+                alert('Your appointment has been booked! A confirmation email will be sent shortly.');
+                
+                // Reset form
+                resetForm();
+            } catch (error) {
+                // Handle error
+                console.error('Error booking appointment:', error);
+                alert('Error: ' + (error.message || 'Failed to book appointment'));
+            } finally {
+                // Hide loader
+                hideLoader(loader);
+            }
+        }, true); // Using capture phase to ensure our handler runs first
+        
+        /**
+         * Collect form data for submission
+         */
+        function collectFormData() {
+            // Get selected values
+            const selectedTimeSlot = document.querySelector('.time-slot.selected');
+            const selectedDuration = document.querySelector('input[name="duration"]:checked');
+            
+            // Verify required selections
+            if (!selectedTimeSlot || !selectedDuration) {
+                throw new Error('Please select a time slot and service duration.');
+            }
+            
+            // Get focus areas as an array
+            const focusAreas = Array.from(document.querySelectorAll('input[name="focus"]:checked'))
+                .map(checkbox => checkbox.value);
+            
+            // Prepare form data
+            return {
+                action: 'massage_booking_create_appointment',
+                nonce: massageBookingAPI.nonce,
+                fullName: document.getElementById('fullName').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                appointmentDate: document.getElementById('appointmentDate').value,
+                startTime: selectedTimeSlot.getAttribute('data-time'),
+                endTime: selectedTimeSlot.getAttribute('data-end-time'),
+                duration: selectedDuration.value,
+                focusAreas: JSON.stringify(focusAreas),
+                pressurePreference: document.getElementById('pressurePreference').value,
+                specialRequests: document.getElementById('specialRequests').value
+            };
         }
         
         /**
-         * Submit the form via AJAX with better error handling
+         * Submit form via AJAX
+         * 
+         * @param {Object} formData Form data to submit
+         * @return {Promise} Promise resolving with server response
          */
         function submitForm(formData) {
             return new Promise((resolve, reject) => {
-                // Store raw formData for debugging
-                const formDataDebug = {...formData};
-                delete formDataDebug.nonce; // Don't log sensitive data
-                console.log('Submitting form data', formDataDebug);
-                
-                // Use jQuery AJAX for maximum compatibility
                 $.ajax({
                     url: massageBookingAPI.ajaxUrl,
                     type: 'POST',
@@ -710,11 +896,11 @@
         }
         
         /**
-         * Helper function to reset the form after successful submission
+         * Reset the form after successful submission
          */
         function resetForm() {
             // Reset form
-            appointmentForm.reset();
+            form.reset();
 
             // Clear selections
             document.querySelectorAll('.radio-option, .checkbox-option, .time-slot').forEach(el => {
@@ -728,7 +914,10 @@
             }
 
             // Reset time slots
-            document.getElementById('timeSlots').innerHTML = '<p>Please select a date to see available time slots.</p>';
+            const timeSlotsElement = document.getElementById('timeSlots');
+            if (timeSlotsElement) {
+                timeSlotsElement.innerHTML = '<p>Please select a date to see available time slots.</p>';
+            }
 
             // Reselect default option (60 min)
             const defaultOption = document.getElementById('duration60');
@@ -741,99 +930,21 @@
             }
             
             // Clear session storage
-            sessionStorage.removeItem('massageBookingFormData');
-        }
-        
-        /**
-         * Collect form data for submission
-         */
-        function collectFormData() {
-            // Get selected values
-            const selectedTimeSlot = document.querySelector('.time-slot.selected');
-            const selectedDuration = document.querySelector('input[name="duration"]:checked');
-
-            // Verify required selections
-            if (!selectedTimeSlot || !selectedDuration) {
-                throw new Error('Please select a time slot and service duration.');
-            }
-
-            // Get focus areas as an array
-            const focusAreas = Array.from(document.querySelectorAll('input[name="focus"]:checked'))
-                .map(checkbox => checkbox.value);
-
-            // Prepare form data
-            return {
-                action: 'massage_booking_create_appointment',
-                nonce: massageBookingAPI.nonce,
-                fullName: document.getElementById('fullName').value,
-                email: document.getElementById('email').value,
-                phone: document.getElementById('phone').value,
-                appointmentDate: document.getElementById('appointmentDate').value,
-                startTime: selectedTimeSlot.getAttribute('data-time'),
-                endTime: selectedTimeSlot.getAttribute('data-end-time'),
-                duration: selectedDuration.value,
-                focusAreas: JSON.stringify(focusAreas),
-                pressurePreference: document.getElementById('pressurePreference').value,
-                specialRequests: document.getElementById('specialRequests').value
-            };
-        }
-        
-        /**
-         * Override the form submission
-         */
-        appointmentForm.addEventListener('submit', async function(e) {
-            // Prevent the default form submission
-            e.preventDefault();
-
-            console.log('Form submission intercepted');
-
-            // Validate using enhanced validation
-            if (typeof enhancedValidation === 'function') {
-                if (!enhancedValidation()) {
-                    console.log('Form validation failed');
-                    return;
-                }
-            } else if (typeof window.validateForm === 'function') {
-                if (!window.validateForm()) {
-                    console.log('Form validation failed');
-                    return;
-                }
-            }
-
-            // Show loader
-            const loader = showLoader();
-
             try {
-                // Collect form data
-                const formData = collectFormData();
-                
-                // Submit the form
-                const result = await submitForm(formData);
-                
-                // Handle success
-                console.log('Appointment successfully created:', result);
-                
-                // Show success message
-                alert('Your appointment has been booked! A confirmation email will be sent shortly.');
-                
-                // Reset form
-                resetForm();
-                
-            } catch (error) {
-                // Handle error
-                console.error('Error booking appointment:', error);
-                alert('Error: ' + (error.message || 'Failed to book appointment'));
-            } finally {
-                // Hide loader
-                hideLoader(loader);
+                sessionStorage.removeItem('massageBookingFormData');
+            } catch (e) {
+                console.warn('Failed to clear session storage:', e);
             }
-        }, true); // Using capture phase to ensure our handler runs first
+        }
         
         // Initialize the form by loading settings
         window.loadSettings = loadSettings;
         window.fetchAvailableTimeSlots = fetchAvailableTimeSlots;
+        window.updateSummary = updateSummary;
+        window.validateForm = validateForm;
+        window.resetForm = resetForm;
         
-        // Initialize with settings
+        // Load settings
         loadSettings().then(() => {
             console.log('Settings loaded and applied to form');
             
@@ -846,16 +957,18 @@
                     // Restore date if it was selected
                     if (formData.appointmentDate) {
                         const dateField = document.getElementById('appointmentDate');
-                        dateField.value = formData.appointmentDate;
-                        
-                        // Trigger date input event to load time slots
-                        const event = new Event('input', { bubbles: true });
-                        dateField.dispatchEvent(event);
+                        if (dateField) {
+                            dateField.value = formData.appointmentDate;
+                            
+                            // Trigger date input event to load time slots
+                            const event = new Event('input', { bubbles: true });
+                            dateField.dispatchEvent(event);
+                        }
                     }
                 }
             } catch (e) {
                 console.warn('Failed to restore saved form state:', e);
             }
         });
-    });
+    }
 })(jQuery);
