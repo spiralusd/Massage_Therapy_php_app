@@ -231,9 +231,18 @@ if (!function_exists('massage_booking_dashboard_page')) {
 
 function massage_booking_load_admin_functions() {
     // Prioritize the admin-page.php implementation
+    if (file_exists(plugin_dir_path(__FILE__) . 'admin/admin-page.php')) {
+        // If the function is defined in admin-page.php, don't use the one from fixes
+        remove_action('admin_menu', 'massage_booking_email_verification_page', 9);
+    }    
     if (file_exists(plugin_dir_path(__FILE__) . 'admin/admin-page.php') 
         && function_exists('massage_booking_logs_page_from_admin_page')) {
         // If the function is defined in admin-page.php, don't load from fixes
         remove_action('admin_menu', 'massage_booking_logs_page', 9);
     }
+}
+
+function massage_booking_load_admin_functions() {
+    // Prioritize the admin-page.php implementation
+
 }
