@@ -97,14 +97,15 @@ function massage_booking_clean_admin_menu() {
         );
     }
     add_action('admin_menu', 'massage_booking_clean_admin_menu', 999);
+    if (!function_exists('massage_booking_dashboard_page')) {
     
-    function massage_booking_dashboard_page() {
-        echo '<div class="wrap">';
-        echo '<h1>Massage Booking Dashboard</h1>';
-        echo '<p>Welcome to the Massage Booking System dashboard.</p>';
-        echo '</div>';
+        function massage_booking_dashboard_page() {
+            echo '<div class="wrap">';
+            echo '<h1>Massage Booking Dashboard</h1>';
+            echo '<p>Welcome to the Massage Booking System dashboard.</p>';
+            echo '</div>';
+        }
     }
-
     /**
      * Add pending appointments count to admin menu
      */

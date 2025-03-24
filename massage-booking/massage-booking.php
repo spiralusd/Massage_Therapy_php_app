@@ -87,6 +87,9 @@ if (file_exists(plugin_dir_path(__FILE__) . 'massage-booking-fixes.php')) {
     require_once plugin_dir_path(__FILE__) . 'massage-booking-fixes.php';
 }
 
+// Include the function fix patch to prevent function redeclaration
+require_once plugin_dir_path(__FILE__) . 'function-fix.php';
+
 /**
  * Improved file loading with error handling and include guards
  */
@@ -210,7 +213,7 @@ add_action('rest_api_init', 'massage_booking_register_rest_routes');
 
 /**
  * Dashboard page for admin
- */
+ 
 function massage_booking_dashboard_page() {
     // Check user capabilities
     if (!current_user_can('manage_options')) {
@@ -344,7 +347,7 @@ function massage_booking_dashboard_page() {
     echo '</div>'; // dashboard-section
     
     echo '</div>'; // wrap
-}
+} */
 
 // Check for admin-page.php file and include it if it exists
 if (file_exists(MASSAGE_BOOKING_PLUGIN_DIR . 'admin/admin-page.php')) {
