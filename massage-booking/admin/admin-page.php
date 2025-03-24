@@ -142,21 +142,175 @@ function massage_booking_clean_admin_menu() {
     /**
      * Logs page content (Placeholder function)
      */
-    function massage_booking_logs_page() {
-        // Check user capabilities
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.', 'massage-booking'));
-        }
-        
-        ?>
-        <div class="wrap massage-booking-admin">
-            <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
-            <div class="card">
-                <h2>Audit Logs</h2>
-                <p>Audit log functionality coming soon.</p>
+    if (!function_exists('massage_booking_logs_page')) {
+        function massage_booking_logs_page() {
+            // Check user capabilities
+            if (!current_user_can('manage_options')) {
+                wp_die(__('You do not have sufficient permissions to access this page.', 'massage-booking'));
+            }
+
+            // Check if Audit Log class exists
+            if (!class_exists('Massage_Booking_Audit_Log')) {
+                echo '<div class="wrap massage-booking-admin">';
+                echo '<h1>Audit Logs</h1>';
+                echo '<div class="notice notice-error"><p>Audit Log functionality is not available.</p></div>';
+                echo '</div>';
+                return;
+            }
+
+            $audit_log = new Massage_Booking_Audit_Log();
+
+            // Pagination
+            $page = isset($_GET['paged']) ? intval($_GET['paged']) : 1;
+            $per_page = 50;
+            $offset = ($page - 1) * $per_page;
+
+            // Filtering options
+            $action_filter = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : '';
+            $date_from = isset($_GET['date_from']) ? sanitize_text_field($_GET['date_from']) : '';
+            $date_to = isset($_GET['date_to']) ? sanitize_text_field($_GET['date_to']) : '';
+
+            // Prepare query arguments
+            $query_args = [
+                'limit' => $per_page,
+                'offset' => $offset,
+                'orderby' => 'created_at',
+                'order' => 'DESC'
+            ];
+
+            // Apply filters
+            if (!empty($action_filter)) {
+                $query_args['action'] = $action_filter;
+            }
+
+            if (!empty($date_from)) {
+                $query_args['date_from'] = $date_from;
+            }
+
+            if (!empty($date_to)) {
+                $query_args['date_to'] = $date_to;
+            }
+
+            // Get logs
+            $logs = $audit_log->get_logs($query_args);
+
+            // Get total log count for pagination
+            $total_logs_args = $query_args;
+            unset($total_logs_args['limit'], $total_logs_args['offset']);
+            $total_logs = count($audit_log->get_logs($total_logs_args));
+            $total_pages = ceil($total_logs / $per_page);
+
+            ?>
+            <div class="wrap massage-booking-admin">
+                <h1>Audit Logs</h1>
+
+                <form method="get" action="">
+                    <input type="hidden" name="page" value="massage-booking-logs">
+
+                    <div class="tablenav top">
+                        <div class="alignleft actions">
+                            <select name="action">
+                                <option value="">All Actions</option>
+                                <?php 
+                                // Get unique actions for dropdown
+                                $unique_actions = array_unique(array_column($logs, 'action'));
+                                foreach ($unique_actions as $action): 
+                                ?>
+                                    <option value="<?php echo esc_attr($action); ?>" <?php selected($action_filter, $action); ?>>
+                                        <?php echo esc_html($action); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+
+                            <input type="date" name="date_from" value="<?php echo esc_attr($date_from); ?>" placeholder="From Date">
+                            <input type="date" name="date_to" value="<?php echo esc_attr($date_to); ?>" placeholder="To Date">
+
+                            <input type="submit" class="button" value="Filter">
+
+                            <?php if (!empty($action_filter) || !empty($date_from) || !empty($date_to)): ?>
+                                <a href="?page=massage-booking-logs" class="button">Reset Filters</a>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if ($total_pages > 1): ?>
+                            <div class="tablenav-pages">
+                                <?php
+                                echo paginate_links([
+                                    'base' => add_query_arg('paged', '%#%'),
+                                    'format' => '',
+                                    'prev_text' => '&laquo;',
+                                    'next_text' => '&raquo;',
+                                    'total' => $total_pages,
+                                    'current' => $page
+                                ]);
+                                ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </form>
+
+                <?php if (empty($logs)): ?>
+                    <p>No audit logs found.</p>
+                <?php else: ?>
+                    <table class="wp-list-table widefat fixed striped">
+                        <thead>
+                            <tr>
+                                <th>Action</th>
+                                <th>User</th>
+                                <th>Object</th>
+                                <th>Details</th>
+                                <th>Date/Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($logs as $log): ?>
+                                <tr>
+                                    <td><?php echo esc_html($log['action']); ?></td>
+                                    <td>
+                                        <?php 
+                                        if (!empty($log['user_id'])) {
+                                            $user = get_userdata($log['user_id']);
+                                            echo esc_html($user ? $user->display_name : 'User #' . $log['user_id']);
+                                        } else {
+                                            echo 'System';
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $object_info = [];
+                                        if (!empty($log['object_id'])) {
+                                            $object_info[] = 'ID: ' . esc_html($log['object_id']);
+                                        }
+                                        if (!empty($log['object_type'])) {
+                                            $object_info[] = 'Type: ' . esc_html($log['object_type']);
+                                        }
+                                        echo implode(' ', $object_info);
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        if (is_array($log['details'])) {
+                                            echo '<pre>' . esc_html(json_encode($log['details'], JSON_PRETTY_PRINT)) . '</pre>';
+                                        } else {
+                                            echo esc_html($log['details'] ?? 'No details');
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $timestamp = isset($log['created_at']) ? $log['created_at'] : $log['timestamp'];
+                                        echo esc_html(date('M j, Y g:i a', strtotime($timestamp))); 
+                                        ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
             </div>
-        </div>
-        <?php
+            <?php
+        }
     }
 
     /**
