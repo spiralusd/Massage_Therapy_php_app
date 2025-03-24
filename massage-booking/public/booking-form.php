@@ -34,6 +34,9 @@ add_action('wp_enqueue_scripts', 'manually_enqueue_massage_booking_styles');
  * Function to display the booking form
  */
 function massage_booking_display_form() {
+    // Start output buffering
+    ob_start();
+    
     // Get settings
     $settings = new Massage_Booking_Settings();
     $business_name = $settings->get_setting('business_name', 'Massage Therapy Practice');
@@ -45,6 +48,11 @@ function massage_booking_display_form() {
         '120' => 165
     ));
     $break_time = $settings->get_setting('break_time', 15);
+    
+    // Add debug code at the beginning to help diagnose
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        echo '<!-- DEBUG: massage_booking_display_form is executing -->';
+    }
 
     // For displaying available days
     $day_names = array(
