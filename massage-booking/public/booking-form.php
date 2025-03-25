@@ -183,3 +183,16 @@ function massage_booking_display_form() {
 if (!function_exists('did_action') || did_action('wp_head')) {
     massage_booking_display_form();
 }
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Find the form element
+    var forms = document.querySelectorAll('form.booking-form, .massage-booking-container form, form');
+    
+    // Assign the ID to the first form found
+    if (forms.length > 0) {
+        forms[0].id = 'appointmentForm';
+        console.log('ID assigned to form: appointmentForm');
+    }
+});
+</script>
