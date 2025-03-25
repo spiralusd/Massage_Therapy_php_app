@@ -177,6 +177,9 @@ function massage_booking_display_form() {
         </form>
     </div>
     <?php
+        
+    // Return the buffered content
+    return ob_get_clean();
 }
 
 // If this file is included outside of a function, display the form
@@ -185,14 +188,22 @@ if (!function_exists('did_action') || did_action('wp_head')) {
 }
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Find the form element
-    var forms = document.querySelectorAll('form.booking-form, .massage-booking-container form, form');
-    
-    // Assign the ID to the first form found
-    if (forms.length > 0) {
-        forms[0].id = 'appointmentForm';
-        console.log('ID assigned to form: appointmentForm');
+// Ensure the form has the correct ID
+(function() {
+    // Run immediately
+    var form = document.querySelector('form.booking-form');
+    if (form && (!form.id || form.id !== 'appointmentForm')) {
+        form.id = 'appointmentForm';
+        console.log('Form ID set to appointmentForm');
     }
-});
+    
+    // Also run when DOM is fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        var forms = document.querySelectorAll('form.booking-form, .massage-booking-container form, form');
+        if (forms.length > 0 && (!forms[0].id || forms[0].id !== 'appointmentForm')) {
+            forms[0].id = 'appointmentForm';
+            console.log('Form ID set to appointmentForm on DOMContentLoaded');
+        }
+    });
+})();
 </script>

@@ -1,0 +1,264 @@
+/**
+ * Cross-Browser Compatibility Styles for Massage Booking Plugin
+ * 
+ * This stylesheet provides consistent styling across browsers by:
+ * 1. Using more explicit selectors to increase specificity
+ * 2. Applying !important to critical styles
+ * 3. Providing fallbacks for browser-specific implementations
+ * 4. Normalizing form element rendering
+ */
+
+/* Container Normalization */
+.massage-booking-container,
+.booking-container,
+form#appointmentForm {
+    box-sizing: border-box !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif !important;
+    width: 100% !important;
+    max-width: 800px !important;
+    margin: 30px auto !important;
+    padding: 20px !important;
+}
+
+/* Form Elements Normalization */
+#appointmentForm .form-group {
+    margin-bottom: 25px !important;
+    position: relative !important;
+}
+
+#appointmentForm label {
+    display: block !important;
+    margin-bottom: 8px !important;
+    font-weight: 600 !important;
+}
+
+/* Input Normalization */
+#appointmentForm input[type="text"],
+#appointmentForm input[type="email"],
+#appointmentForm input[type="tel"],
+#appointmentForm input[type="date"],
+#appointmentForm textarea,
+#appointmentForm select {
+    width: 100% !important;
+    padding: 12px !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    font-size: 16px !important;
+    background-color: #fff !important;
+    box-sizing: border-box !important;
+    -webkit-appearance: none !important; /* Removes iOS styling */
+    appearance: none !important;
+}
+
+/* Fix date input rendering */
+#appointmentForm input[type="date"] {
+    height: auto !important;
+    line-height: normal !important;
+    padding-right: 30px !important; /* Space for the calendar icon */
+}
+
+/* Fix Firefox date input */
+@-moz-document url-prefix() {
+    #appointmentForm input[type="date"] {
+        padding: 10px 12px !important;
+    }
+}
+
+/* Fix Chrome date input */
+#appointmentForm input[type="date"]::-webkit-calendar-picker-indicator {
+    background-color: transparent !important;
+    cursor: pointer !important;
+    position: absolute !important;
+    right: 10px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 20px !important;
+    height: 20px !important;
+}
+
+/* Radio & Checkbox Options */
+#appointmentForm .radio-group,
+#appointmentForm .checkbox-group {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 15px !important;
+    margin-top: 10px !important;
+}
+
+#appointmentForm .radio-option,
+#appointmentForm .checkbox-option {
+    background-color: #fff !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    padding: 15px !important;
+    cursor: pointer !important;
+    transition: all 0.3s !important;
+    flex: 1 1 200px !important;
+    position: relative !important;
+}
+
+/* Selected States */
+#appointmentForm .radio-option.selected,
+#appointmentForm .checkbox-option.selected {
+    border-color: #4a6fa5 !important;
+    background-color: rgba(74, 111, 165, 0.1) !important;
+}
+
+/* Reset default browser styles */
+#appointmentForm input[type="radio"],
+#appointmentForm input[type="checkbox"] {
+    margin: 0 8px 0 0 !important;
+    vertical-align: middle !important;
+}
+
+/* Time Slots */
+#appointmentForm .time-slots {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+    gap: 10px !important;
+    margin-top: 15px !important;
+}
+
+#appointmentForm .time-slot {
+    background-color: #fff !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    padding: 10px !important;
+    text-align: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s !important;
+    user-select: none !important;
+}
+
+#appointmentForm .time-slot.selected {
+    background-color: #4a6fa5 !important;
+    color: #fff !important;
+    border-color: #4a6fa5 !important;
+}
+
+#appointmentForm .time-slot.unavailable {
+    background-color: #f1f1f1 !important;
+    color: #999 !important;
+    cursor: not-allowed !important;
+    text-decoration: line-through !important;
+}
+
+/* Summary Section */
+#appointmentForm .summary {
+    margin-top: 20px !important;
+    background-color: #f9f9f9 !important;
+    padding: 15px !important;
+    border-radius: 4px !important;
+    border-left: 4px solid #4a6fa5 !important;
+    display: none !important;
+}
+
+#appointmentForm .summary.visible {
+    display: block !important;
+}
+
+/* Error Messages */
+#appointmentForm .validation-errors,
+#appointmentForm .form-error-message {
+    background-color: #f8d7da !important;
+    color: #721c24 !important;
+    padding: 15px !important;
+    margin-bottom: 20px !important;
+    border: 1px solid #f5c6cb !important;
+    border-radius: 4px !important;
+}
+
+/* Submit Button */
+#appointmentForm button[type="submit"] {
+    background-color: #4a6fa5 !important;
+    color: white !important;
+    border: none !important;
+    padding: 12px 25px !important;
+    font-size: 16px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    transition: background-color 0.3s !important;
+    display: block !important;
+    margin: 30px auto 0 !important;
+    -webkit-appearance: none !important; /* Removes iOS styling */
+    appearance: none !important;
+}
+
+#appointmentForm button[type="submit"]:hover {
+    background-color: #3a5a84 !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #appointmentForm .time-slots {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    
+    #appointmentForm .radio-group,
+    #appointmentForm .checkbox-group {
+        flex-direction: column !important;
+    }
+    
+    #appointmentForm .radio-option,
+    #appointmentForm .checkbox-option {
+        flex: 1 1 100% !important;
+    }
+}
+
+/* Fix for Firefox flex issues */
+@-moz-document url-prefix() {
+    #appointmentForm .radio-group,
+    #appointmentForm .checkbox-group {
+        display: -moz-box !important;
+        -moz-box-pack: start !important;
+        -moz-box-align: stretch !important;
+        flex-wrap: wrap !important;
+    }
+}
+
+/* Fix for iOS Safari */
+@supports (-webkit-touch-callout: none) {
+    #appointmentForm input[type="date"] {
+        min-height: 44px !important;
+    }
+    
+    #appointmentForm button[type="submit"] {
+        min-height: 44px !important;
+    }
+}
+
+/* Loading states */
+#appointmentForm .time-slots.loading {
+    position: relative !important;
+    min-height: 100px !important;
+}
+
+#appointmentForm .time-slots.loading::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 30px !important;
+    height: 30px !important;
+    border: 3px solid #f3f3f3 !important;
+    border-top: 3px solid #4a6fa5 !important;
+    border-radius: 50% !important;
+    animation: spin 1s linear infinite !important;
+}
+
+@keyframes spin {
+    0% { transform: translate(-50%, -50%) rotate(0deg); }
+    100% { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Ensure proper z-index for overlays */
+#loadingOverlay {
+    z-index: 9999 !important;
+}
+
+/* Ensure privacy notice text doesn't get too small */
+#appointmentForm .privacy-notice p {
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}

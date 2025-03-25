@@ -94,6 +94,14 @@ add_action('init', 'massage_booking_register_shortcodes');
 function massage_booking_form_shortcode($atts) {
     ob_start();
     massage_booking_display_form();
+        
+    // Pass WordPress data to JavaScript
+    wp_localize_script('massage-booking-api-connector', 'massageBookingAPI', array(
+        'restUrl' => esc_url_raw(rest_url('massage-booking/v1/')),
+        'nonce' => wp_create_nonce('wp_rest'),
+        'ajaxUrl' => admin_url('admin-ajax.php')
+    ));
+    
     return ob_get_clean();
 }
 add_shortcode('massage_booking_form', 'massage_booking_form_shortcode');
