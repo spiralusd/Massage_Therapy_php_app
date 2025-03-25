@@ -21,8 +21,16 @@
             console.error('Appointment form not found with ID "appointmentForm"');
             console.log('Trying alternative selectors...');
             
-            // Try a few alternative selectors
-            const possibleForms = document.querySelectorAll('form.booking-form, .massage-booking-container form, .booking-form-container form');
+            // Try a lot more alternative selectors
+            const possibleForms = document.querySelectorAll(
+                'form.booking-form, ' + 
+                '.massage-booking-container form, ' + 
+                '.booking-form-container form, ' + 
+                '.wp-block-shortcode form, ' + 
+                'div.entry-content form, ' + 
+                'article form, ' + 
+                'form'  // Last resort: just find ANY form on the page
+            );
             
             if (possibleForms.length > 0) {
                 console.log('Found alternative form:', possibleForms[0]);
