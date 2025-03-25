@@ -639,4 +639,32 @@
         window.resetForm = resetForm;
         window.disableUnavailableDays = disableUnavailableDays;
     });
+    
+    // Improved handling of unavailable days
+    function disableUnavailableDays() {
+        const dateInput = document.getElementById('appointmentDate');
+        if (!dateInput) return;
+
+        const availableDaysAttr = dateInput.getAttribute('data-available-days');
+        if (!availableDaysAttr) return;
+
+        const availableDays = availableDaysAttr.split(',').map(Number);
+
+        // Create a datepicker if jQuery UI is available
+        if ($.fn.datepicker) {
+            $(dateInput).datepicker({
+                beforeShowDay: function(date) {
+                    const day = date.getDay();
+                    return [availableDays.includes(day), ''];
+                },
+                dateFormat: 'yy-mm-dd',
+                minDate: 0 // Today
+            });
+        } else {
+            // Fallback to manual validation
+            dateInput.addEventListener('input', function() {
+                validateSelectedDate(this, availableDays);
+            });
+        }
+    }
 })();

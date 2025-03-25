@@ -408,6 +408,8 @@
                     return cachedSlots;
                 }
                 
+                console.log('Fetching time slots for date:', date, 'with duration:', duration);
+                
                 // Show loading indicator
                 const slotsContainer = document.getElementById('timeSlots');
                 if (!slotsContainer) return { available: false, slots: [] };
@@ -755,45 +757,42 @@
          * Override the form submission
          */
         form.addEventListener('submit', async function(e) {
-            // Prevent the default form submission
             e.preventDefault();
-            e.stopPropagation();
-            
+            e.stopPropagation(); // Prevent event bubbling
+
             console.log('Form submission intercepted');
-            
-            // Validate the form
+
+            // Validate form first
             if (!validateForm()) {
                 console.log('Form validation failed');
                 return false;
             }
-            
-            // Show loader
+
+            // Show loading indicator
             const loader = showLoader();
-            
+
             try {
                 // Collect form data
                 const formData = collectFormData();
-                
-                // Submit the form
+
+                // Submit form data
                 const result = await submitForm(formData);
-                
-                // Handle success
-                console.log('Appointment successfully created:', result);
-                
+
+                console.log('Appointment created successfully:', result);
+
                 // Show success message
                 alert('Your appointment has been booked! A confirmation email will be sent shortly.');
-                
-                // Reset form
+
+                // Reset form after successful submission
                 resetForm();
             } catch (error) {
-                // Handle error
-                console.error('Error booking appointment:', error);
+                console.error('Error creating appointment:', error);
                 alert('Error: ' + (error.message || 'Failed to book appointment'));
             } finally {
                 // Hide loader
                 hideLoader(loader);
             }
-        }, true); // Using capture phase to ensure our handler runs first
+        });
         
         /**
          * Collect form data for submission

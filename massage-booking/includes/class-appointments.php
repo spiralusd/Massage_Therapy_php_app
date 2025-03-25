@@ -148,6 +148,9 @@ class Massage_Booking_Appointments {
             'available' => true,
             'slots' => $available_slots
         ]);
+        
+        error_log('Working day schedule for ' . $day_name . ': ' . json_encode($day_schedule));
+        error_log("Working days: " . json_encode($working_days));
     }
     
     public function create_appointment($request) {

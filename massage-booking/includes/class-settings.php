@@ -52,7 +52,9 @@ class Massage_Booking_Settings {
     }
     
     public function get_setting($key, $default = null) {
-        return get_option($this->options_prefix . $key, $default);
+        $value = get_option($this->options_prefix . $key, $default);
+        error_log("Getting setting {$key}: " . json_encode($value));
+        return $value;
     }
     
     public function update_setting($key, $value) {
@@ -90,4 +92,5 @@ class Massage_Booking_Settings {
             'business_name' => $this->get_setting('business_name', 'Massage Therapy Practice')
         ];
     }
+    
 }
