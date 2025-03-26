@@ -11,19 +11,11 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Don't output anything during REST API or AJAX requests
-if (defined('REST_REQUEST') && REST_REQUEST) {
-    return;
-}
-
-if (defined('DOING_AJAX') && DOING_AJAX) {
-    return;
-}
-
+// Enqueue styles
 function manually_enqueue_massage_booking_styles() {
     wp_enqueue_style(
         'massage-booking-form-style', 
-        '/wp-content/plugins/massage-booking/public/css/booking-form.css', 
+        plugin_dir_url(__FILE__) . 'css/booking-form.css', 
         array(), 
         '1.0.2'
     );
@@ -36,6 +28,12 @@ add_action('wp_enqueue_scripts', 'manually_enqueue_massage_booking_styles');
 function massage_booking_display_form() {
     // Start output buffering
     ob_start();
+    
+    // Check if settings class exists
+    if (!class_exists('Massage_Booking_Settings')) {
+        echo '<p>Error: Settings class not available.</p>';
+        return ob_get_clean();
+    }
     
     // Get settings
     $settings = new Massage_Booking_Settings();
@@ -181,29 +179,3 @@ function massage_booking_display_form() {
     // Return the buffered content
     return ob_get_clean();
 }
-
-// If this file is included outside of a function, display the form
-if (!function_exists('did_action') || did_action('wp_head')) {
-    massage_booking_display_form();
-}
-
-<script>
-// Ensure the form has the correct ID
-(function() {
-    // Run immediately
-    var form = document.querySelector('form.booking-form');
-    if (form && (!form.id || form.id !== 'appointmentForm')) {
-        form.id = 'appointmentForm';
-        console.log('Form ID set to appointmentForm');
-    }
-    
-    // Also run when DOM is fully loaded
-    document.addEventListener('DOMContentLoaded', function() {
-        var forms = document.querySelectorAll('form.booking-form, .massage-booking-container form, form');
-        if (forms.length > 0 && (!forms[0].id || forms[0].id !== 'appointmentForm')) {
-            forms[0].id = 'appointmentForm';
-            console.log('Form ID set to appointmentForm on DOMContentLoaded');
-        }
-    });
-})();
-</script>

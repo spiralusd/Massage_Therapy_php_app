@@ -228,5 +228,13 @@ if (!function_exists('massage_booking_load_admin_functions')) {
     }
 }
 
+function remove_header_footer_for_booking_page() {
+    if (is_page_template('page-booking.php') || is_page_template('page-booking-direct.php')) {
+        remove_all_actions('get_header');
+        remove_all_actions('get_footer');
+    }
+}
+add_action('template_redirect', 'remove_header_footer_for_booking_page');
+
 // Register the function loader with a unique priority
 //add_action('admin_menu', 'massage_booking_load_admin_functions', 9);

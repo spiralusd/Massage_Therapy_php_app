@@ -368,3 +368,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     cursor: pointer;
     display: none;
 }
+
+    .page-id-165 header {
+        display: none !important;
+    }
+
+    .page-id-165 footer {
+        display: none !important;
+    }

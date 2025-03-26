@@ -399,5 +399,4 @@
     // Expose the handler in case it needs to be manually triggered
     window.initMassageBookingFormHandler = initFormHandler;
     
-    
 })(jQuery);

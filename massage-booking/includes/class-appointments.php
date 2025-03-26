@@ -154,69 +154,33 @@ class Massage_Booking_Appointments {
     }
     
     public function create_appointment($request) {
-        $params = $request->get_params();
-        
-        // Validate required fields
-        $required_fields = ['fullName', 'email', 'phone', 'appointmentDate', 'startTime', 'duration'];
-        foreach ($required_fields as $field) {
-            if (empty($params[$field])) {
-                return new WP_Error('missing_field', 'Missing required field: ' . $field, ['status' => 400]);
+        try {
+            // Log the incoming request if debug mode is on
+            if (defined('WP_DEBUG') && WP_DEBUG && function_exists('massage_booking_debug_log')) {
+                massage_booking_debug_log(
+                    'REST API appointment creation attempt', 
+                    $request->get_params(), 
+                    'info', 
+                    'API_SUBMISSION'
+                );
             }
+
+            $submission_handler = new Massage_Booking_Appointments_Submission();
+
+            // Merge request parameters to ensure all data is captured
+            $_POST = array_merge($_POST, $request->get_params());
+
+            return $submission_handler->create_appointment(true);
+        } catch (Exception $e) {
+            // Log any unexpected errors
+            error_log('Unexpected error in REST API appointment creation: ' . $e->getMessage());
+
+            return rest_ensure_response([
+                'success' => false,
+                'message' => 'An unexpected error occurred',
+                'error' => $e->getMessage()
+            ]);
         }
-        
-        // Prepare appointment data
-        $appointment_data = [
-            'full_name' => sanitize_text_field($params['fullName']),
-            'email' => sanitize_email($params['email']),
-            'phone' => sanitize_text_field($params['phone']),
-            'appointment_date' => sanitize_text_field($params['appointmentDate']),
-            'start_time' => sanitize_text_field($params['startTime']),
-            'end_time' => isset($params['endTime']) ? sanitize_text_field($params['endTime']) : $this->calculate_end_time($params['startTime'], $params['duration']),
-            'duration' => intval($params['duration']),
-            'focus_areas' => isset($params['focusAreas']) ? $params['focusAreas'] : [],
-            'pressure_preference' => isset($params['pressurePreference']) ? sanitize_text_field($params['pressurePreference']) : '',
-            'special_requests' => isset($params['specialRequests']) ? sanitize_textarea_field($params['specialRequests']) : ''
-        ];
-        
-        // Check if the slot is still available
-        if (!$this->check_slot_availability($appointment_data)) {
-            return new WP_Error('slot_unavailable', 'This time slot is no longer available', ['status' => 409]);
-        }
-        
-        // Add to Office 365 Calendar if configured
-        $calendar_event_id = '';
-        if ($this->is_calendar_configured()) {
-            $calendar = new Massage_Booking_Calendar();
-            $event_result = $calendar->create_event($appointment_data);
-            
-            if (!is_wp_error($event_result) && isset($event_result['id'])) {
-                $calendar_event_id = $event_result['id'];
-                $appointment_data['calendar_event_id'] = $calendar_event_id;
-            }
-        }
-        
-        // Save appointment
-        $db = new Massage_Booking_Database();
-        $appointment_id = $db->create_appointment($appointment_data);
-        
-        if (!$appointment_id) {
-            // If calendar event was created but appointment saving failed, delete the event
-            if ($calendar_event_id) {
-                $calendar = new Massage_Booking_Calendar();
-                $calendar->delete_event($calendar_event_id);
-            }
-            
-            return new WP_Error('db_error', 'Failed to save appointment', ['status' => 500]);
-        }
-        
-        // Send confirmation emails - use class-emails.php only if it exists
-        $this->send_confirmation_emails($appointment_data);
-        do_action('massage_booking_after_appointment_created', $appointment_id, $appointment_data);
-        
-        return rest_ensure_response([
-            'success' => true,
-            'appointment_id' => $appointment_id
-        ]);
     }
     
     private function calculate_end_time($start_time, $duration) {

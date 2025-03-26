@@ -18,7 +18,7 @@ if (!defined('MASSAGE_BOOKING_DEBUG')) {
 
 /**
  * Helper function for debug logging
- */
+
 function massage_booking_debug_log($message, $data = null) {
     if (MASSAGE_BOOKING_DEBUG) {
         if ($data !== null) {
@@ -35,6 +35,7 @@ function massage_booking_debug_log($message, $data = null) {
         error_log('MASSAGE BOOKING DEBUG: ' . $log_message);
     }
 }
+ */
 
 /**
  * Add debugging info to footer on booking pages (admin only)

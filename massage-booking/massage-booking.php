@@ -85,6 +85,8 @@ function massage_booking_check_requirements() {
 
 // Include the function fix patch to prevent function redeclaration
 require_once plugin_dir_path(__FILE__) . 'function-fix.php';
+require_once plugin_dir_path(__FILE__) . 'function-fix-enhanced.php'; 
+
 
 /**
  * Improved file loading with error handling and include guards
@@ -100,6 +102,7 @@ function massage_booking_load_files() {
         'includes/class-audit-log-optimized.php',
         'includes/class-emails.php',
         'includes/class-appointments.php',
+        'includes/class-appointments-submission.php',
         'admin/settings-page.php'
     ];
 
@@ -208,6 +211,11 @@ function massage_booking_enqueue_scripts() {
         return;
     }
 
+    // Debug log inclusion
+    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('massage_booking_debug_log')) {
+        massage_booking_debug_log('Enqueuing scripts and styles', null, 'info', 'SCRIPTS');
+    }
+
     // Get plugin version for cache busting
     $version = defined('MASSAGE_BOOKING_VERSION') ? MASSAGE_BOOKING_VERSION : '1.1.1';
     
@@ -230,16 +238,25 @@ function massage_booking_enqueue_scripts() {
     // 3. Ensure jQuery is loaded
     wp_enqueue_script('jquery');
     
-    // 4. Enqueue the base form script
+    // 4. Enqueue the form initializer FIRST (before any other scripts)
     wp_enqueue_script(
-        'massage-booking-form-script',
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/booking-form.js',
+        'massage-booking-form-initializer',
+        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/form-initializer.js',
         array('jquery'),
         $version,
         true
     );
     
-    // 5. Enqueue the minified form script as fallback
+    // 5. Enqueue the base form script (depends on form-initializer)
+    wp_enqueue_script(
+        'massage-booking-form-script',
+        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/booking-form.js',
+        array('jquery', 'massage-booking-form-initializer'),
+        $version,
+        true
+    );
+    
+    // 6. Enqueue the minified form script as fallback
     wp_enqueue_script(
         'massage-booking-form-min-script',
         MASSAGE_BOOKING_PLUGIN_URL . 'public/js/booking-form-min.js',
@@ -248,26 +265,25 @@ function massage_booking_enqueue_scripts() {
         true
     );
     
-    // 6. Enqueue API connector
+    // 7. Enqueue API connector (depends on form-initializer)
     wp_enqueue_script(
         'massage-booking-api-connector',
         MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-connector.js',
-        array('jquery', 'massage-booking-form-script'),
+        array('jquery', 'massage-booking-form-initializer', 'massage-booking-form-script'),
         $version,
         true
     );
     
-    // 7. Pass WordPress data to JavaScript
-    wp_localize_script('massage-booking-api-connector', 'massageBookingAPI', array(
-        'restUrl' => esc_url_raw(rest_url('massage-booking/v1/')),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'ajaxUrl' => admin_url('admin-ajax.php'),
-        'siteUrl' => get_site_url(),
-        'isLoggedIn' => is_user_logged_in() ? 'yes' : 'no',
-        'version' => $version
-    ));
+    // 8. Enqueue API connector fix
+    wp_enqueue_script(
+        'massage-booking-api-connector-fix',
+        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-connector-fix.js',
+        array('jquery', 'massage-booking-api-connector'),
+        $version . '.' . time(), // Force reload
+        true
+    );
     
-    // 8. Enqueue jQuery form handler
+    // 9. Enqueue jQuery form handler
     wp_enqueue_script(
         'massage-booking-jquery-form',
         MASSAGE_BOOKING_PLUGIN_URL . 'public/js/jquery-form-handler.js',
@@ -276,7 +292,16 @@ function massage_booking_enqueue_scripts() {
         true
     );
     
-    // 9. Enqueue cross-browser compatibility script
+    // 10. Enqueue fixed jQuery form handler
+    wp_enqueue_script(
+        'massage-booking-jquery-form-fix',
+        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/jquery-form-handler-fix.js',
+        array('jquery', 'massage-booking-jquery-form'),
+        $version . '.' . time(), // Force reload
+        true
+    );
+    
+    // 11. Enqueue cross-browser compatibility script
     wp_enqueue_script(
         'massage-booking-compatibility',
         MASSAGE_BOOKING_PLUGIN_URL . 'public/js/cross-browser-fix.js',
@@ -285,7 +310,7 @@ function massage_booking_enqueue_scripts() {
         true
     );
     
-    // 10. Enqueue API patch with highest priority to ensure it loads last
+    // 12. Enqueue API patch with highest priority to ensure it loads last
     wp_enqueue_script(
         'massage-booking-api-patch',
         MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-connector-patch.js',
@@ -294,7 +319,16 @@ function massage_booking_enqueue_scripts() {
         true
     );
     
-    // 11. Enqueue API troubleshooter in debug mode
+    // 13. Enqueue API diagnostics tool
+    wp_enqueue_script(
+        'massage-booking-api-diagnostics',
+        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-diagnostics-tool.js',
+        array('jquery', 'massage-booking-api-connector-fix'),
+        $version . '.' . time(), // Force reload to avoid caching
+        true
+    );
+    
+    // 14. Enqueue API troubleshooter in debug mode
     if (defined('WP_DEBUG') && WP_DEBUG) {
         wp_enqueue_script(
             'massage-booking-troubleshooter',
@@ -305,7 +339,19 @@ function massage_booking_enqueue_scripts() {
         );
     }
     
-    // 12. Optional: Add inline script to ensure massageBookingAPI is available
+    // 15. Pass WordPress data to JavaScript with enhanced data
+    wp_localize_script('massage-booking-api-connector', 'massageBookingAPI', array(
+        'restUrl' => esc_url_raw(rest_url('massage-booking/v1/')),
+        'nonce' => wp_create_nonce('wp_rest'),
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'siteUrl' => get_site_url(),
+        'isLoggedIn' => is_user_logged_in() ? 'yes' : 'no',
+        'version' => $version,
+        'wpDebug' => defined('WP_DEBUG') && WP_DEBUG ? 'yes' : 'no',
+        'formAction' => 'massage_booking_create_appointment'
+    ));
+    
+    // 16. Add inline script to ensure massageBookingAPI is available
     wp_add_inline_script('massage-booking-api-connector', '
         // Ensure API data is available
         if (typeof massageBookingAPI === "undefined") {
@@ -317,13 +363,35 @@ function massage_booking_enqueue_scripts() {
                 siteUrl: "' . esc_url(get_site_url()) . '",
                 isLoggedIn: "' . (is_user_logged_in() ? 'yes' : 'no') . '",
                 version: "' . esc_js($version) . '",
+                formAction: "massage_booking_create_appointment",
                 isFallback: true
             };
         }
     ');
+    
+    // Log scripts enqueued if debugging is enabled
+    if (defined('WP_DEBUG') && WP_DEBUG && function_exists('massage_booking_debug_log')) {
+        $scripts_enqueued = array(
+            'massage-booking-form-initializer',
+            'massage-booking-form-script',
+            'massage-booking-form-min-script',
+            'massage-booking-api-connector',
+            'massage-booking-api-connector-fix',
+            'massage-booking-jquery-form',
+            'massage-booking-jquery-form-fix',
+            'massage-booking-compatibility',
+            'massage-booking-api-patch'
+        );
+        
+        foreach ($scripts_enqueued as $script) {
+            if (!wp_script_is($script, 'enqueued')) {
+                massage_booking_debug_log("Script not enqueued: {$script}", null, 'error', 'SCRIPTS');
+            }
+        }
+    }
 }
-add_action('wp_enqueue_scripts', 'massage_booking_enqueue_scripts', 20);
 
+add_action('wp_enqueue_scripts', 'massage_booking_enqueue_scripts');
 /**
  * Register REST API endpoints
  */

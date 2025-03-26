@@ -1,6 +1,6 @@
 <?php
 /**
- * Massage Booking Shortcodes
+ * Massage Booking Shortcodes - Fixed Version
  *
  * Provides shortcodes to embed the booking form and related elements.
  */
@@ -24,7 +24,7 @@ add_action('init', 'massage_booking_register_shortcodes');
  * Main booking form shortcode
  * Usage: [massage_booking_form]
  */
-/**function massage_booking_form_shortcode($atts) {
+function massage_booking_form_shortcode($atts) {
     // Parse attributes
     $atts = shortcode_atts(array(
         'title' => '',
@@ -32,79 +32,21 @@ add_action('init', 'massage_booking_register_shortcodes');
         'show_privacy' => 'true',
     ), $atts, 'massage_booking_form');
     
-    // Enqueue necessary styles and scripts
-    wp_enqueue_style(
-        'massage-booking-form-style', 
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/css/booking-form.css',
-        array(),
-        MASSAGE_BOOKING_VERSION
-    );
+    // Check if the function exists
+    if (!function_exists('massage_booking_display_form')) {
+        // Include the booking form file
+        require_once(MASSAGE_BOOKING_PLUGIN_DIR . 'public/booking-form.php');
+    }
     
-    // Enqueue original form script
-    wp_enqueue_script(
-        'massage-booking-form-script',
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/booking-form.js',
-        array('jquery'),
-        MASSAGE_BOOKING_VERSION,
-        true
-    );
+    // Check again if the function exists after including the file
+    if (!function_exists('massage_booking_display_form')) {
+        return '<div class="error">Error: Booking form function not available even after including file.</div>';
+    }
     
-    // Enqueue API connector (this must load after the original script)
-    wp_enqueue_script(
-        'massage-booking-api-connector',
-        MASSAGE_BOOKING_PLUGIN_URL . 'public/js/api-connector.js',
-        array('jquery', 'massage-booking-form-script'),
-        MASSAGE_BOOKING_VERSION,
-        true
-    );
-    
-    // Pass WordPress data to JavaScript
-    wp_localize_script('massage-booking-api-connector', 'massageBookingAPI', array(
-        'restUrl' => esc_url_raw(rest_url('massage-booking/v1/')),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'ajaxUrl' => admin_url('admin-ajax.php')
-    ));
-    
-    // Start output buffering to return content
-    ob_start();
-    
-    // Get settings
-    $settings = new Massage_Booking_Settings();
-    $business_name = $settings->get_setting('business_name', 'Massage Therapy Practice');
-    
-    // Custom title or default
-    $title = !empty($atts['title']) ? $atts['title'] : 'Book Your Appointment';
-    
-    // Output container start
-    echo '<div class="massage-booking-container">';
-    
-    // Output title
-    echo '<h2 class="massage-booking-title">' . esc_html($title) . '</h2>';
-    
-    // Include the booking form
-    include_once(MASSAGE_BOOKING_PLUGIN_DIR . 'public/templates/original-booking-form.html');
-    
-    // Output container end
-    echo '</div>';
-    
-    // Return the buffered content
-    return ob_get_clean();
-}*/
-
-function massage_booking_form_shortcode($atts) {
-    ob_start();
-    massage_booking_display_form();
-        
-    // Pass WordPress data to JavaScript
-    wp_localize_script('massage-booking-api-connector', 'massageBookingAPI', array(
-        'restUrl' => esc_url_raw(rest_url('massage-booking/v1/')),
-        'nonce' => wp_create_nonce('wp_rest'),
-        'ajaxUrl' => admin_url('admin-ajax.php')
-    ));
-    
-    return ob_get_clean();
+    // Return the form
+    return massage_booking_display_form();
 }
-add_shortcode('massage_booking_form', 'massage_booking_form_shortcode');
+
 /**
  * Business hours shortcode
  * Usage: [massage_business_hours]
